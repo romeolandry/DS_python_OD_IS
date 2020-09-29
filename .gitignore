@@ -130,3 +130,13 @@ dmypy.json
 
 # TensorRT engine 
 *.engine
+*.mp4
+
+# sample directory
+/deepstream-ssd-parser/
+
+# streams
+/streams/
+
+# vscode
+.vscode
