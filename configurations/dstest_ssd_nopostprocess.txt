@@ -7,7 +7,7 @@ infer_config {
       model_name: "ssd_inception_v2_coco_2018_01_28"
       version: -1
       model_repo {
-        root: "../Models/trtis_model"
+        root: "../Models/tritis_model"
         log_level: 2
         tf_gpu_memory_fraction: 0.4
         tf_disable_soft_placement: 0
@@ -26,7 +26,7 @@ infer_config {
   }
 
   postprocess {
-    labelfile_path: "../Models/trtis_model/ssd_inception_v2_coco_2018_01_28/labels.txt"
+    labelfile_path: "../Models/tritis_model/ssd_inception_v2_coco_2018_01_28/labels.txt"
     other {}
   }
 

@@ -24,8 +24,10 @@
 
 import argparse
 import sys
+import os
+sys.path.append(os.path.abspath(os.curdir))
 import run_config as config
-sys.path.append(config.CUR_DIR)
+#sys.path.append(config.CUR_DIR)
 
 import gi
 gi.require_version('Gst', '1.0')
