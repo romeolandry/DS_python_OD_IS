@@ -32,9 +32,9 @@ sys.path.append(os.path.abspath(os.curdir))
 
 import run_config as config
 
-
 import gi
 gi.require_version("Gst", "1.0")
+gi.require_version('GstRtspServer', '1.0')
 
 from gi.repository import GObject, Gst, GstRtspServer
 
@@ -42,20 +42,6 @@ from utils.common.is_aarch_64 import is_aarch64
 from utils.common.bus_call import bus_call
 from utils.trtis.ssd_parser import nvds_infer_parse_custom_tf_ssd, DetectionParam, NmsParam, BoxSizeParam
 import pyds
-
-
-
-
-CLASS_NB = 91
-ACCURACY_ALL_CLASS = 0.5
-UNTRACKED_OBJECT_ID = 0xffffffffffffffff
-IMAGE_HEIGHT = 1080
-IMAGE_WIDTH = 1920
-MIN_BOX_WIDTH = 32
-MIN_BOX_HEIGHT = 32
-TOP_K = 20
-IOU_THRESHOLD = 0.3
-##OUTPUT_VIDEO_NAME = "./streams/out.mp4"
 
 
 def get_label_names_from_file(filepath):
@@ -84,7 +70,7 @@ def make_elm_or_print_err(factoryname, name, printedname, detail=""):
 def osd_sink_pad_buffer_probe(pad, info, u_data):
     frame_number = 0
     # Intiallizing object counter with 0.
-    obj_counter = dict(enumerate([0] * CLASS_NB))
+    obj_counter = dict(enumerate([0] * config.CLASS_NB))
     num_rects = 0
 
     gst_buffer = info.get_buffer()
@@ -135,7 +121,7 @@ def osd_sink_pad_buffer_probe(pad, info, u_data):
         # allocated string. Use pyds.get_string() to get the string content.
         id_dict = {
             val: index
-            for index, val in enumerate(get_label_names_from_file("Models/trtis_model/ssd_inception_v2_coco_2018_01_28/labels.txt"))
+            for index, val in enumerate(get_label_names_from_file(config.COCO_LABEL_PATH))
         }
         disp_string = "Frame Number={} Number of Objects={} Vehicle_count={} Person_count={}"
         py_nvosd_text_params.display_text = disp_string.format(
@@ -177,10 +163,10 @@ def add_obj_meta_to_frame(frame_object, batch_meta, frame_meta, label_names):
     obj_meta = pyds.nvds_acquire_obj_meta_from_pool(batch_meta)
     # Set bbox properties. These are in input resolution.
     rect_params = obj_meta.rect_params
-    rect_params.left = int(IMAGE_WIDTH * frame_object.left)
-    rect_params.top = int(IMAGE_HEIGHT * frame_object.top)
-    rect_params.width = int(IMAGE_WIDTH * frame_object.width)
-    rect_params.height = int(IMAGE_HEIGHT * frame_object.height)
+    rect_params.left = int(config.IMAGE_WIDTH * frame_object.left)
+    rect_params.top = int(config.IMAGE_HEIGHT * frame_object.top)
+    rect_params.width = int(config.IMAGE_WIDTH * frame_object.width)
+    rect_params.height = int(config.IMAGE_HEIGHT * frame_object.height)
 
     # Semi-transparent yellow backgroud
     rect_params.has_bg_color = 0
@@ -196,7 +182,7 @@ def add_obj_meta_to_frame(frame_object, batch_meta, frame_meta, label_names):
 
     # There is no tracking ID upon detection. The tracker will
     # assign an ID.
-    obj_meta.object_id = UNTRACKED_OBJECT_ID
+    obj_meta.object_id = config.UNTRACKED_OBJECT_ID
 
     lbl_id = frame_object.classId
     if lbl_id >= len(label_names):
@@ -244,12 +230,12 @@ def pgie_src_pad_buffer_probe(pad, info, u_data):
     batch_meta = pyds.gst_buffer_get_nvds_batch_meta(hash(gst_buffer))
     l_frame = batch_meta.frame_meta_list
 
-    detection_params = DetectionParam(CLASS_NB, ACCURACY_ALL_CLASS)
-    box_size_param = BoxSizeParam(IMAGE_HEIGHT, IMAGE_WIDTH,
-                                  MIN_BOX_WIDTH, MIN_BOX_HEIGHT)
-    nms_param = NmsParam(TOP_K, IOU_THRESHOLD)
+    detection_params = DetectionParam(config.CLASS_NB, config.ACCURACY_ALL_CLASS)
+    box_size_param = BoxSizeParam(config.IMAGE_HEIGHT, config.IMAGE_WIDTH,
+                                  config.MIN_BOX_WIDTH, config.MIN_BOX_HEIGHT)
+    nms_param = NmsParam(config.TOP_K, config.IOU_THRESHOLD)
 
-    label_names = get_label_names_from_file("Models/trtis_model/ssd_inception_v2_coco_2018_01_28/labels.txt")
+    label_names = get_label_names_from_file(config.COCO_LABEL_PATH)
 
     while l_frame is not None:
         try:
@@ -307,7 +293,7 @@ def pgie_src_pad_buffer_probe(pad, info, u_data):
     return Gst.PadProbeReturn.OK
 
 
-def main(args):
+def main(model):
 
     # Standard GStreamer initialization
     GObject.threads_init()
@@ -363,18 +349,6 @@ def main(args):
     # Create Post ODS Convertor for RTSP
     nvvidconv_post_osd = make_elm_or_print_err("nvvideoconvert", "convertor_postosd", "Post OSD for nvosd")
 
-
-    # Finally encode and save the osd output
-    #queue = make_elm_or_print_err("queue", "queue", "Queue")
-
-    #nvvidconv2 = make_elm_or_print_err("nvvideoconvert", "convertor2", "Converter 2 (nvvidconv2)")
-
-    #capsfilter = make_elm_or_print_err("capsfilter", "capsfilter", "capsfilter")
-    ### caps for h264 datei to change as we will use raspberry Pi Camera
-    #caps = Gst.Caps.from_string("video/x-raw, format=I420")
-    #capsfilter.set_property("caps", caps)
-    #################################################################
-
     # On Jetson, there is a problem with the encoder failing to initialize
     # due to limitation on TLS usage. To work around this, preload libgomp.
     # Add a reminder here in case the user forgets.
@@ -382,19 +356,6 @@ def main(args):
                        "/usr/lib/aarch64-linux-gnu/libgomp.so.1: cannot allocate memory in static TLS block\n" + \
                        "Preload the offending library:\n" + \
                        "export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1\n"
-    ## encoder for out_file
-    #encoder = make_elm_or_print_err("avenc_mpeg4", "encoder", "Encoder", preload_reminder)
-
-    #encoder.set_property("bitrate", 2000000)
-
-    #codeparser = make_elm_or_print_err("mpeg4videoparse", "mpeg4-parser", 'Code Parser')
-
-    #container = make_elm_or_print_err("qtmux", "qtmux", "Container")
-    #sink = make_elm_or_print_err("filesink", "filesink", "Sink")
-
-    #sink.set_property("location", OUTPUT_VIDEO_NAME)
-    #sink.set_property("sync", 0)
-    #sink.set_property("async", 0)
 
     ################################### CSI_Camera set properties #####################################
 
@@ -406,6 +367,10 @@ def main(args):
     streammux.set_property('height', config.CAMERA_HEIGHT)
     streammux.set_property('batch-size', config.BATCH_SIZE)
     streammux.set_property('batched-push-timeout', config.BATCH_PUSH_TIMEOUT)
+
+    ## Create Filter for RTSP
+    caps_rtsp = make_elm_or_print_err("capsfilter", "filter", "caps_rtsp")
+    caps_rtsp.set_property("caps", Gst.Caps.from_string("video/x-raw(memory:NVMM), format=I420"))
 
     ##############################################################################################
 
@@ -424,10 +389,6 @@ def main(args):
         encoder_rtsp.set_property('preset-level', 1)
         encoder_rtsp.set_property('insert-sps-pps', 1)
         encoder_rtsp.set_property('bufapi-version', 1)
-    
-    ## Create Filter for RTSP
-    caps_rtsp = make_elm_or_print_err("capsfilter", "filter", "caps_rtsp")
-    caps_rtsp.set_property("caps", Gst.Caps.from_string("video/x-raw(memory:NVMM), format=I420"))
 
     # Make the payload-encode video into RTP packets
     if config.CODEC == "H264":
@@ -449,17 +410,7 @@ def main(args):
     sink_rtsp.set_property('sync', 1)
 
 
-    ##################### change play file to play CIS-Camera ####################
-    #print("Playing file %s " % args[1])
-    #source.set_property("location", args[1])
-    #streammux.set_property("width", IMAGE_WIDTH)
-    #streammux.set_property("height", IMAGE_HEIGHT)
-    #streammux.set_property("batch-size", 1)
-    #streammux.set_property("batched-push-timeout", 4000000)
-    #############################################################
-
-
-    pgie.set_property("config-file-path", "configurations/dstest_ssd_nopostprocess.txt")
+    pgie.set_property("config-file-path",config.CONFIG_SSD_INCEPTIONV2_COCO)
     ##################### change play file to play CIS-Camera ####################
 
 
@@ -476,11 +427,6 @@ def main(args):
     pipeline.add(caps_rtsp)
     pipeline.add(encoder_rtsp)
     pipeline.add(rtppay)
-    #pipeline.add(queue)
-    #pipeline.add(capsfilter)
-    #pipeline.add(encoder)
-    #pipeline.add(codeparser)
-    #pipeline.add(container)
     pipeline.add(sink_rtsp)
 
     ## add comment to show pipeline struckture.
@@ -505,14 +451,6 @@ def main(args):
     encoder_rtsp.link(rtppay)
     rtppay.link(sink_rtsp)
 
-    #nvosd.link(queue)
-    #queue.link(nvvidconv2)
-    #nvvidconv2.link(capsfilter)
-    #capsfilter.link(encoder)
-    #encoder.link(codeparser)
-    #codeparser.link(container)
-    #container.link(sink)
-
     # create an event loop and feed gstreamer bus mesages to it
     loop = GObject.MainLoop()
     bus = pipeline.get_bus()
@@ -530,9 +468,9 @@ def main(args):
     factory = GstRtspServer.RTSPMediaFactory.new()
     factory.set_launch( "( udpsrc name=pay0 port=%d buffer-size=524288 caps=\"application/x-rtp, media=video, clock-rate=90000, encoding-name=(string)%s, payload=96 \" )" % (updsink_port_num, config.CODEC))
     factory.set_shared(True)
-    server.get_mount_points().add_factory("/ds-resnet10", factory)
+    server.get_mount_points().add_factory("/"+ str(model), factory)
     
-    print("\n *** DeepStream: Launched RTSP Streaming at rtsp://localhost:%d/ds-resnet10 ***\n\n" % rtsp_port_num)
+    print(f"\n *** DeepStream: Launched RTSP Streaming at rtsp://localhost:{rtsp_port_num}/{model} ***\n\n", )
     
     # Add a probe on the primary-infer source pad to get inference output tensors
     pgiesrcpad = pgie.get_static_pad("src")
@@ -559,7 +497,3 @@ def main(args):
         pass
     # cleanup
     pipeline.set_state(Gst.State.NULL)
-
-
-if __name__ == "__main__":
-    sys.exit(main(sys.argv))
