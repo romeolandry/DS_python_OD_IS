@@ -26,7 +26,7 @@ import argparse
 import sys
 import os
 sys.path.append(os.path.abspath(os.curdir))
-import run_config as config
+import configurations.configuration as config
 #sys.path.append(config.CUR_DIR)
 
 import gi

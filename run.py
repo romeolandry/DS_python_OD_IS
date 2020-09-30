@@ -3,7 +3,7 @@ import sys
 import os
 from python_app import deepstream_ssd_parser_rasbery_to_rtsp as ds_tf_ssd
 from python_app import deepstream_od_resnet10_4_classes as ds_od_restnet
-import run_config as config
+import configurations.configuration as config
 
 # Clear the GStreamer cache if pipeline creation 
 print("\n")
