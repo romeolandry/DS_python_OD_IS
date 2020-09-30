@@ -133,7 +133,7 @@ dmypy.json
 *.mp4
 
 # sample directory
-/deepstream-ssd-parser/
+/deepstream-ssd-parser
 
 # streams
 /streams/

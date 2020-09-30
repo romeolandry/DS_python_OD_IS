@@ -30,7 +30,7 @@ import os
 
 sys.path.append(os.path.abspath(os.curdir))
 
-import run_config as config
+import configurations.configuration as config
 
 import gi
 gi.require_version("Gst", "1.0")
