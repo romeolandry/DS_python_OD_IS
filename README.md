@@ -12,7 +12,7 @@ This poject run Deepstream SDK V 5.0 to inference native Tensorflow using triton
 - `--model` Give the of the model you wont to inference with. the both inerence have already pre-configured model setting.
     - TensorRT `['resnet10','custom']`
     - Trinton Inference Server `['yolov3', 'ssd_inceptionv2', 'custom']`
-    - choose `custom` to run with inference methode with you own model.
+    - choose `custom` to run the inference methode with you own model.
 
 - `--input` to give the input path of Raspberry camera. the default has already been setted in to [the run configuration file](/configurations/configuration.py).
 - `birate` and `codec` can also be configurate in the same file.

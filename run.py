@@ -29,7 +29,7 @@ if __name__ == '__main__':
         print("###################### __________________Use Triton server for Inference__________________#############################\n")
         if(args.model not in config.AVAILABLE_TRITIS_MODEL):
             print("\n Not Availoable model to set custom model please")
-            print(f"The availble model are {config.AVAILABLE_TRITIS_MODEL}")
+            print(f"The availble model are {config.AVAILABLE_TRITIS_MODEL}.")
             print("choose custom to set your custom madel \n\n")
         else:
             if (args.model != "custom"):
@@ -46,4 +46,4 @@ if __name__ == '__main__':
         else:
             if (args.model != "custom"):
                 print(f"Running TRT with {args.model} model \n")   
-                ds_od_restnet.main()
+                ds_od_restnet.main(args.model)
