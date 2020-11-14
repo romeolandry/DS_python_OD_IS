@@ -25,6 +25,7 @@
 import argparse
 import sys
 import os
+import socket
 sys.path.append(os.path.abspath(os.curdir))
 import configurations.configuration as config
 #sys.path.append(config.CUR_DIR)
@@ -128,7 +129,7 @@ def osd_sink_pad_buffer_probe(pad,info,u_data):
     return Gst.PadProbeReturn.OK	
 
 
-def main():
+def main(model):
     # Standard GStreamer initialization
     GObject.threads_init()
     Gst.init(None)
@@ -297,8 +298,8 @@ def main():
     factory.set_launch( "( udpsrc name=pay0 port=%d buffer-size=524288 caps=\"application/x-rtp, media=video, clock-rate=90000, encoding-name=(string)%s, payload=96 \" )" % (updsink_port_num, config.CODEC))
     factory.set_shared(True)
     server.get_mount_points().add_factory("/ds-resnet10", factory)
-    
-    print("\n *** DeepStream: Launched RTSP Streaming at rtsp://localhost:%d/ds-resnet10 ***\n\n" % rtsp_port_num)
+    print("\n *** Deepstream run on %s \n\n" % socket.gethostname())    
+    print("\n *** DeepStream: Launched RTSP Streaming at rtsp://%s:%d/%s ***\n\n" % (socket.gethostbyname(socket.gethostname()),rtsp_port_num,model))
     
     # Lets add probe to get informed of the meta data generated, we add probe to
     # the sink pad of the osd element, since by that time, the buffer would have
