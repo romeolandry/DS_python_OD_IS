@@ -14,7 +14,13 @@ BATCH_PUSH_TIMEOUT= 4000000 # Default is 4000000
 CODEC = "H264" # RTSP Streaming Codec H264/H265
 BITRATE = 4000000 #  Set the encoding bitrate. Type INT
 RTSP_PORT = 8554
-UDP_PORT_SINK=5400
+UDP_CONF ={
+    'host':'224.224.255.255',
+    'port': 5400,
+    'async': False,
+    'sync': 1
+}
+
 
 # MODEL CONFIGURATION
 AVAILABLE_TRT_MODEL = ['resnet10','custom']

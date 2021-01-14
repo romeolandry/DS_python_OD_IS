@@ -17,10 +17,6 @@ parser.add_argument("--tritis", default=False, action="store_true", help="Activa
 parser.add_argument("--model", choices= list(set(config.AVAILABLE_TRT_MODEL + config.AVAILABLE_TRITIS_MODEL)),
                         help="choose which model you wont to inference; custom you use your own model",
                         required=True)
-parser.add_argument("-i", "--input", help="path to device CIS-device", default= config.CSI_INPUT)
-parser.add_argument("-c", "--codec", help="RTSP Streaming Codec H264/H265" , default=config.CODEC, choices=['H264','H265'])
-parser.add_argument("-b", "--bitrate", help="Set the encoding bitrate ", default=config.BITRATE, type=int)
-
 
 if __name__ == '__main__':
     args = parser.parse_args()

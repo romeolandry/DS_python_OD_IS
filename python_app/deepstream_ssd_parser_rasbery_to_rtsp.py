@@ -1,28 +1,7 @@
-#!/usr/bin/env python3
-
-################################################################################
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
-#
-# Permission is hereby granted, free of charge, to any person obtaining a
-# copy of this software and associated documentation files (the "Software"),
-# to deal in the Software without restriction, including without limitation
-# the rights to use, copy, modify, merge, publish, distribute, sublicense,
-# and/or sell copies of the Software, and to permit persons to whom the
-# Software is furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-# DEALINGS IN THE SOFTWARE.
-################################################################################
-
-""" Example of deepstream using SSD neural network and parsing SSD's outputs. """
+""" 
+ this deepstream use an SSD neural network and parsing SSD's outputs.
+ the output are rendered as rtsp stream 
+ """
 
 import sys
 import io
@@ -30,7 +9,7 @@ import os
 
 sys.path.append(os.path.abspath(os.curdir))
 
-import configurations.configuration as config
+import configurations.configuration as cfg
 
 import gi
 gi.require_version("Gst", "1.0")
@@ -43,6 +22,8 @@ from utils.common.bus_call import bus_call
 from utils.trtis.ssd_parser import nvds_infer_parse_custom_tf_ssd, DetectionParam, NmsParam, BoxSizeParam
 import pyds
 
+from python_app.pipeline_src import cis_camera_source as make_src_elt
+from python_app.pipeline_sink import rtsp_sink
 
 def get_label_names_from_file(filepath):
     """ Read a label file and convert it to string list """
@@ -70,7 +51,7 @@ def make_elm_or_print_err(factoryname, name, printedname, detail=""):
 def osd_sink_pad_buffer_probe(pad, info, u_data):
     frame_number = 0
     # Intiallizing object counter with 0.
-    obj_counter = dict(enumerate([0] * config.CLASS_NB))
+    obj_counter = dict(enumerate([0] * cfg.CLASS_NB))
     num_rects = 0
 
     gst_buffer = info.get_buffer()
@@ -121,7 +102,7 @@ def osd_sink_pad_buffer_probe(pad, info, u_data):
         # allocated string. Use pyds.get_string() to get the string content.
         id_dict = {
             val: index
-            for index, val in enumerate(get_label_names_from_file(config.COCO_LABEL_PATH))
+            for index, val in enumerate(get_label_names_from_file(cfg.COCO_LABEL_PATH))
         }
         disp_string = "Frame Number={} Number of Objects={} Vehicle_count={} Person_count={}"
         py_nvosd_text_params.display_text = disp_string.format(
@@ -163,10 +144,10 @@ def add_obj_meta_to_frame(frame_object, batch_meta, frame_meta, label_names):
     obj_meta = pyds.nvds_acquire_obj_meta_from_pool(batch_meta)
     # Set bbox properties. These are in input resolution.
     rect_params = obj_meta.rect_params
-    rect_params.left = int(config.IMAGE_WIDTH * frame_object.left)
-    rect_params.top = int(config.IMAGE_HEIGHT * frame_object.top)
-    rect_params.width = int(config.IMAGE_WIDTH * frame_object.width)
-    rect_params.height = int(config.IMAGE_HEIGHT * frame_object.height)
+    rect_params.left = int(cfg.IMAGE_WIDTH * frame_object.left)
+    rect_params.top = int(cfg.IMAGE_HEIGHT * frame_object.top)
+    rect_params.width = int(cfg.IMAGE_WIDTH * frame_object.width)
+    rect_params.height = int(cfg.IMAGE_HEIGHT * frame_object.height)
 
     # Semi-transparent yellow backgroud
     rect_params.has_bg_color = 0
@@ -182,7 +163,7 @@ def add_obj_meta_to_frame(frame_object, batch_meta, frame_meta, label_names):
 
     # There is no tracking ID upon detection. The tracker will
     # assign an ID.
-    obj_meta.object_id = config.UNTRACKED_OBJECT_ID
+    obj_meta.object_id = cfg.UNTRACKED_OBJECT_ID
 
     lbl_id = frame_object.classId
     if lbl_id >= len(label_names):
@@ -230,12 +211,12 @@ def pgie_src_pad_buffer_probe(pad, info, u_data):
     batch_meta = pyds.gst_buffer_get_nvds_batch_meta(hash(gst_buffer))
     l_frame = batch_meta.frame_meta_list
 
-    detection_params = DetectionParam(config.CLASS_NB, config.ACCURACY_ALL_CLASS)
-    box_size_param = BoxSizeParam(config.IMAGE_HEIGHT, config.IMAGE_WIDTH,
-                                  config.MIN_BOX_WIDTH, config.MIN_BOX_HEIGHT)
-    nms_param = NmsParam(config.TOP_K, config.IOU_THRESHOLD)
+    detection_params = DetectionParam(cfg.CLASS_NB, cfg.ACCURACY_ALL_CLASS)
+    box_size_param = BoxSizeParam(cfg.IMAGE_HEIGHT, cfg.IMAGE_WIDTH,
+                                  cfg.MIN_BOX_WIDTH, cfg.MIN_BOX_HEIGHT)
+    nms_param = NmsParam(cfg.TOP_K, cfg.IOU_THRESHOLD)
 
-    label_names = get_label_names_from_file(config.COCO_LABEL_PATH)
+    label_names = get_label_names_from_file(cfg.COCO_LABEL_PATH)
 
     while l_frame is not None:
         try:
@@ -307,32 +288,9 @@ def main(model):
     if not pipeline:
         sys.stderr.write(" Unable to create Pipeline \n")
     
-    ########################### change source element: file to rasbery ##########################
     # Source element for reading from the file
-    print("Creating Source \n")
-    source = Gst.ElementFactory.make("nvarguscamerasrc", "src-elem")
-    if not source:
-        sys.stderr.write(" Unable to create Source \n")
-
-    # Converter to scale the image
-    nvvidconv_src = Gst.ElementFactory.make("nvvideoconvert", "convertor_src")
-    if not nvvidconv_src:
-        sys.stderr.write(" Unable to create nvvidconv_src \n")
-    
-    # Caps for NVMM and resolution scaling
-    caps_nvvidconv_src = Gst.ElementFactory.make("capsfilter", "nvmm_caps")
-    if not caps_nvvidconv_src:
-        sys.stderr.write(" Unable to create capsfilter \n")
-
-    # Since the data format in the input file is elementary h264 stream,
-    # we need a h264parser
-    #h264parser = make_elm_or_print_err("h264parse", "h264-parser", "H264Parser")
-
-    # Use nvdec_h264 for hardware accelerated decode on GPU
-    #decoder = make_elm_or_print_err("nvv4l2decoder", "nvv4l2-decoder", "Decoder")
-
-    ################################################################################################################
-
+    source, nvvidconv_src, caps_nvvidconv_src = make_src_elt("test")
+   
     # Create nvstreammux instance to form batches from one or more sources.
     streammux = make_elm_or_print_err("nvstreammux", "Stream-muxer", "NvStreamMux")
 
@@ -349,68 +307,19 @@ def main(model):
     # Create Post ODS Convertor for RTSP
     nvvidconv_post_osd = make_elm_or_print_err("nvvideoconvert", "convertor_postosd", "Post OSD for nvosd")
 
-    # On Jetson, there is a problem with the encoder failing to initialize
-    # due to limitation on TLS usage. To work around this, preload libgomp.
-    # Add a reminder here in case the user forgets.
-    preload_reminder = "If the following error is encountered:\n" + \
-                       "/usr/lib/aarch64-linux-gnu/libgomp.so.1: cannot allocate memory in static TLS block\n" + \
-                       "Preload the offending library:\n" + \
-                       "export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1\n"
-
-    ################################### CSI_Camera set properties #####################################
-
-    source.set_property('bufapi-version', True)
-
-    caps_nvvidconv_src.set_property('caps', Gst.Caps.from_string('video/x-raw(memory:NVMM), width=1280, height=720'))
-
-    streammux.set_property('width', config.CAMERA_WIDTH)
-    streammux.set_property('height', config.CAMERA_HEIGHT)
-    streammux.set_property('batch-size', config.BATCH_SIZE)
-    streammux.set_property('batched-push-timeout', config.BATCH_PUSH_TIMEOUT)
-
-    ## Create Filter for RTSP
-    caps_rtsp = make_elm_or_print_err("capsfilter", "filter", "caps_rtsp")
-    caps_rtsp.set_property("caps", Gst.Caps.from_string("video/x-raw(memory:NVMM), format=I420"))
-
-    ##############################################################################################
-
-    ################################## Make an encoder for RTSP ##################################
-
-    if config.CODEC == "H264":
-        encoder_rtsp = make_elm_or_print_err("nvv4l2h264enc","encoder", "Encoder",preload_reminder)
-        print("Creating H264 Encoder")
-    elif config.CODEC == "H265":
-        encoder_rtsp = make_elm_or_print_err("nvv4l2h265enc","encoder", "Encoder",preload_reminder)
-        print("Creating H265 Encoder")
     
+    streammux.set_property('width', cfg.CAMERA_WIDTH)
+    streammux.set_property('height', cfg.CAMERA_HEIGHT)
+    streammux.set_property('batch-size', cfg.BATCH_SIZE)
+    streammux.set_property('batched-push-timeout', cfg.BATCH_PUSH_TIMEOUT)
 
-    encoder_rtsp.set_property('bitrate', config.BITRATE)
-    if is_aarch64():
-        encoder_rtsp.set_property('preset-level', 1)
-        encoder_rtsp.set_property('insert-sps-pps', 1)
-        encoder_rtsp.set_property('bufapi-version', 1)
+    ###################################### Create RTPS Sink Element
+    caps_rtsp,encoder_rtsp,rtppay,sink_rtsp = rtsp_sink(cfg.CODEC,
+                                                         cfg.BITRATE,
+                                                         cfg.UDP_CONF)
+    ################################################
 
-    # Make the payload-encode video into RTP packets
-    if config.CODEC == "H264":
-        rtppay = make_elm_or_print_err("rtph264pay", "rtppay","RTPPAY")
-        print("Creating H264 rtppay")
-    elif config.CODEC == "H265":
-        rtppay = make_elm_or_print_err("rtph265pay", "rtppay","RTPPAY")
-        print("Creating H265 rtppay")
-    if not rtppay:
-        sys.stderr.write(" Unable to create rtppay")
-    
-    # Make the UDP sink for RTSP
-    updsink_port_num = config.UDP_PORT_SINK
-    sink_rtsp = make_elm_or_print_err("udpsink","udpsink","Sink For RTSP")
-    
-    sink_rtsp.set_property('host', '224.224.255.255')
-    sink_rtsp.set_property('port', updsink_port_num)
-    sink_rtsp.set_property('async', False)
-    sink_rtsp.set_property('sync', 1)
-
-
-    pgie.set_property("config-file-path",config.CONFIG_SSD_INCEPTIONV2_COCO)
+    pgie.set_property("config-file-path", cfg.CONFIG_SSD_INCEPTIONV2_COCO)
     ##################### change play file to play CIS-Camera ####################
 
 
@@ -462,15 +371,15 @@ def main(model):
     rtsp_port_num = 8554
     
     server = GstRtspServer.RTSPServer.new()
-    server.props.service = "%d" % rtsp_port_num
+    server.props.service = "%d" % cfg.RTSP_PORT
     server.attach(None)
     
     factory = GstRtspServer.RTSPMediaFactory.new()
-    factory.set_launch( "( udpsrc name=pay0 port=%d buffer-size=524288 caps=\"application/x-rtp, media=video, clock-rate=90000, encoding-name=(string)%s, payload=96 \" )" % (updsink_port_num, config.CODEC))
+    factory.set_launch( "( udpsrc name=pay0 port=%d buffer-size=524288 caps=\"application/x-rtp, media=video, clock-rate=90000, encoding-name=(string)%s, payload=96 \" )" % (cfg.UDP_CONF['port'], cfg.CODEC))
     factory.set_shared(True)
     server.get_mount_points().add_factory("/"+ str(model), factory)
     
-    print(f"\n *** DeepStream: Launched RTSP Streaming at rtsp://localhost:{rtsp_port_num}/{model} ***\n\n", )
+    print(f"\n *** DeepStream: Launched RTSP Streaming at rtsp://localhost:{cfg.RTSP_PORT}/{model} ***\n\n")
     
     # Add a probe on the primary-infer source pad to get inference output tensors
     pgiesrcpad = pgie.get_static_pad("src")
