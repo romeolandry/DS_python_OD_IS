@@ -55,12 +55,14 @@ an simple pipeline is:
 	Elt_A.link(Elt_B)
 	Elt_B.link(Elt_C)
 	sud_Elt_of_C.link(Elt_D)
+
 5- Create event loop to run the pipeline
 
 	loop = GObject.MainLoop() "Declaration"
 	bus = pipeline.get_bus()
 	bus.add_signal_watch()
 	bus.connect ("message", bus_call, loop)
+
 6- Adding a probe to get the meta data generated
 
 	# we add probe to the sink pad of the osd element, since by that time, 
@@ -100,7 +102,7 @@ an simple pipeline is:
 
 you have set camera to play
 
-	 print("Playing cam %s " %args[1])
+	print("Playing cam %s " %args[1])
     caps_v4l2src.set_property('caps', Gst.Caps.from_string("video/x-raw, framerate=30/1"))
     caps_vidconvsrc.set_property('caps', Gst.Caps.from_string("video/x-raw(memory:NVMM)"))
     source.set_property('device', args[1])
@@ -116,7 +118,7 @@ you have set camera to play
 
 and set CIS -device / set source property
 
-	 source.set_property('bufapi-version', True)
+	source.set_property('bufapi-version', True)
 
     caps_nvvidconv_src.set_property('caps', Gst.Caps.from_string('video/x-raw(memory:NVMM), width=1280, height=720'))
 
@@ -143,6 +145,28 @@ and set CIS -device / set source property
 
 - No module named 'gi'
 	
-	if running into an virtualenv add the following line `sys.path.append('/usr/lib/python3/dist-packages')` to bind the python installation 
+	if running into an virtualenv add the following line `sys.path.append('/usr/lib/python3/dist-packages')` to bind the python installation.
+	this wouldn't work if `gi` is not installed
+		
+	```shell
+		# install gi python3
+		$ sudo apt-get install python3-gi
+	```
+
+	
 	or just run it without an virtualenv.
+
+	to install gi inside your virtual env
+		
+	```shel
+		# install `gi` using vext way
+		$ pip install vext
+
+		$ pip install vext.gi
+	```
+
+	numpy import problem `llegal instruction (core dumped)`
+
+	- [build](https://www.programmersought.com/article/27735169699/) follow the given instruction. for computer not for Jetson nano
+	
 
