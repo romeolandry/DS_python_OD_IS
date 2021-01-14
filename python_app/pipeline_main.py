@@ -1,31 +1,28 @@
-""" This deepstream use an SSD neural network and parsing SSD's outputs.
- the output are rendered as rtsp stream.
- """
-
 import sys
 import io
 import os
 import gi
-import configurations.configuration as cfg
+sys.path.append(os.path.join('..', os.curdir))
+
+gi.require_version("Gst", "1.0")
+gi.require_version('GstRtspServer', '1.0')
 
 from gi.repository import GObject, Gst, GstRtspServer
-from utils.common.is_aarch_64 import is_aarch64
-from utils.common.bus_call import bus_call
+
 from utils.trtis.ssd_parser import (nvds_infer_parse_custom_tf_ssd,
                                     DetectionParam,
                                     NmsParam,
                                     BoxSizeParam
                                     )
-import pyds
+                         
+global PGIE_CLASS_ID_VEHICLE
+PGIE_CLASS_ID_VEHICLE = 0
+global PGIE_CLASS_ID_PERSON
+PGIE_CLASS_ID_PERSON = 2
 
-from python_app.pipeline_src import cis_camera_source as make_src_elt
-from python_app.pipeline_sink import rtsp_sink
-
-sys.path.append(os.path.abspath(os.curdir))
-
-
-gi.require_version("Gst", "1.0")
-gi.require_version('GstRtspServer', '1.0')
+PGIE_CLASS_ID_BICYCLE = 1
+PGIE_CLASS_ID_PERSON = 2
+PGIE_CLASS_ID_ROADSIGN = 3
 
 
 def get_label_names_from_file(filepath):
@@ -51,10 +48,10 @@ def make_elm_or_print_err(factoryname, name, printedname, detail=""):
     return elm
 
 
-def osd_sink_pad_buffer_probe(pad, info, u_data):
+def osd_sink_pad_buffer_probe(pad, info, u_data, data_cfg):
     frame_number = 0
     # Intiallizing object counter with 0.
-    obj_counter = dict(enumerate([0] * cfg.CLASS_NB))
+    obj_counter = dict(enumerate([0] * data_cfg['nb_classes']))
     num_rects = 0
 
     gst_buffer = info.get_buffer()
@@ -103,7 +100,7 @@ def osd_sink_pad_buffer_probe(pad, info, u_data):
         # memory will not be claimed by the garbage collector.
         # Reading the display_text field here will return the C address of the
         # allocated string. Use pyds.get_string() to get the string content.
-        label_names_from_file = get_label_names_from_file(cfg.COCO_LABEL_PATH)
+        label_names_from_file = get_label_names_from_file(data_cfg['patht_to_label'])
         id_dict = {
             val: index
             for index, val in enumerate(label_names_from_file)
@@ -142,17 +139,23 @@ def osd_sink_pad_buffer_probe(pad, info, u_data):
     return Gst.PadProbeReturn.OK
 
 
-def add_obj_meta_to_frame(frame_object, batch_meta, frame_meta, label_names):
+def add_obj_meta_to_frame(frame_object,
+                          batch_meta,
+                          frame_meta,
+                          label_names,
+                          model_cfg
+                          ):
+
     """ Inserts an object into the metadata """
     # this is a good place to insert objects into the metadata.
     # Here's an example of inserting a single object.
     obj_meta = pyds.nvds_acquire_obj_meta_from_pool(batch_meta)
     # Set bbox properties. These are in input resolution.
     rect_params = obj_meta.rect_params
-    rect_params.left = int(cfg.IMAGE_WIDTH * frame_object.left)
-    rect_params.top = int(cfg.IMAGE_HEIGHT * frame_object.top)
-    rect_params.width = int(cfg.IMAGE_WIDTH * frame_object.width)
-    rect_params.height = int(cfg.IMAGE_HEIGHT * frame_object.height)
+    rect_params.left = int(model_cfg['img_width'] * frame_object.left)
+    rect_params.top = int(model_cfg['img_height'] * frame_object.top)
+    rect_params.width = int(model_cfg['img_width'] * frame_object.width)
+    rect_params.height = int(model_cfg['img_height'] * frame_object.height)
 
     # Semi-transparent yellow backgroud
     rect_params.has_bg_color = 0
@@ -168,7 +171,7 @@ def add_obj_meta_to_frame(frame_object, batch_meta, frame_meta, label_names):
 
     # There is no tracking ID upon detection. The tracker will
     # assign an ID.
-    obj_meta.object_id = cfg.UNTRACKED_OBJECT_ID
+    obj_meta.object_id = model_cfg['untracted_object_id']
 
     lbl_id = frame_object.classId
     if lbl_id >= len(label_names):
@@ -201,9 +204,15 @@ def add_obj_meta_to_frame(frame_object, batch_meta, frame_meta, label_names):
     pyds.nvds_add_obj_meta_to_frame(frame_meta, obj_meta, None)
 
 
-def pgie_src_pad_buffer_probe(pad, info, u_data):
+def pgie_src_pad_buffer_probe(pad,
+                              info,
+                              u_data,
+                              model_cfg,
+                              data_cfg
+                              ):
 
     gst_buffer = info.get_buffer()
+
     if not gst_buffer:
         print("Unable to get GstBuffer ")
         return
@@ -214,12 +223,17 @@ def pgie_src_pad_buffer_probe(pad, info, u_data):
     batch_meta = pyds.gst_buffer_get_nvds_batch_meta(hash(gst_buffer))
     l_frame = batch_meta.frame_meta_list
 
-    detection_params = DetectionParam(cfg.CLASS_NB, cfg.ACCURACY_ALL_CLASS)
-    box_size_param = BoxSizeParam(cfg.IMAGE_HEIGHT, cfg.IMAGE_WIDTH,
-                                  cfg.MIN_BOX_WIDTH, cfg.MIN_BOX_HEIGHT)
-    nms_param = NmsParam(cfg.TOP_K, cfg.IOU_THRESHOLD)
+    detection_params = DetectionParam(data_cfg['nb_classes'], data_cfg['accuracy_all_class'])
+    box_size_param = BoxSizeParam(model_cfg['img_height'],
+                                  model_cfg['img_width'],
+                                  model_cfg['min_box_width'],
+                                  model_cfg['min_box_height']
+                                  )
+    nms_param = NmsParam(model_cfg['top_k'],
+                         model_cfg['iou_threshold']
+                         )
 
-    label_names = get_label_names_from_file(cfg.COCO_LABEL_PATH)
+    label_names = get_label_names_from_file(data_cfg['patht_to_label'])
 
     while l_frame is not None:
         try:
@@ -242,9 +256,7 @@ def pgie_src_pad_buffer_probe(pad, info, u_data):
             except StopIteration:
                 break
 
-            if (
-                    user_meta.base_meta.meta_type != pyds.NvDsMetaType.NVDSINFER_TENSOR_OUTPUT_META
-            ):
+            if (user_meta.base_meta.meta_type != pyds.NvDsMetaType.NVDSINFER_TENSOR_OUTPUT_META):
                 continue
 
             tensor_meta = pyds.NvDsInferTensorMeta.cast(user_meta.user_meta_data)
@@ -276,145 +288,96 @@ def pgie_src_pad_buffer_probe(pad, info, u_data):
     return Gst.PadProbeReturn.OK
 
 
-def main(model):
+# tiler_sink_pad_buffer_probe  will extract metadata received on tiler src pad
+# and update params for drawing rectangle, object information etc.
+def tiler_sink_pad_buffer_probe(pad, info, u_data):
+    frame_number = 0
+    num_rects = 0
+    gst_buffer = info.get_buffer()
+    if not gst_buffer:
+        print("Unable to get GstBuffer ")
+        return
 
-    # Standard GStreamer initialization
-    GObject.threads_init()
-    Gst.init(None)
+    # Retrieve batch metadata from the gst_buffer
+    # Note that pyds.gst_buffer_get_nvds_batch_meta() expects the
+    # C address of gst_buffer as input, which is obtained with hash(gst_buffer)
+    batch_meta = pyds.gst_buffer_get_nvds_batch_meta(hash(gst_buffer))
 
-    # Create gstreamer elements
-    # Create Pipeline element that will form a connection of other elements
-    print("Creating Pipeline \n ")
-    pipeline = Gst.Pipeline()
+    l_frame = batch_meta.frame_meta_list
+    while l_frame is not None:
+        try:
+            # Note that l_frame.data needs a cast to pyds.NvDsFrameMeta
+            # The casting is done by pyds.NvDsFrameMeta.cast()
+            # The casting also keeps ownership of the underlying memory
+            # in the C code, so the Python garbage collector will leave
+            # it alone.
+            frame_meta = pyds.NvDsFrameMeta.cast(l_frame.data)
+        except StopIteration:
+            break
 
-    if not pipeline:
-        sys.stderr.write(" Unable to create Pipeline \n")
+        frame_number = frame_meta.frame_num
+        l_obj = frame_meta.obj_meta_list
+        num_rects = frame_meta.num_obj_meta
+        is_first_obj = True
+        save_image = False
 
-    # Source element for reading from the file
-    source, nvvidconv_src, caps_nvvidconv_src = make_src_elt("test")
+        obj_counter = {
+            PGIE_CLASS_ID_VEHICLE: 0,
+            PGIE_CLASS_ID_PERSON: 0,
+            PGIE_CLASS_ID_BICYCLE: 0,
+            PGIE_CLASS_ID_ROADSIGN: 0
+        }
+        while l_obj is not None:
+            try:
+                # Casting l_obj.data to pyds.NvDsObjectMeta
+                obj_meta = pyds.NvDsObjectMeta.cast(l_obj.data)
+            except StopIteration:
+                break
+            obj_counter[obj_meta.class_id] += 1
+            # Periodically check for objects with borderline confidence value that may be false positive detections.
+            # If such detections are found, annoate the frame with bboxes and confidence value.
+            # Save the annotated frame to file.
+            if((saved_count["stream_" + str(frame_meta.pad_index)] % 30 == 0) and (obj_meta.confidence > 0.3 and obj_meta.confidence < 0.31)):
+                if is_first_obj:
+                    is_first_obj = False
+                    # Getting Image data using nvbufsurface
+                    # the input should be address of buffer and batch_id
+                    n_frame = pyds.get_nvds_buf_surface(hash(gst_buffer), frame_meta.batch_id)
+                    # convert python array into numy array format.
+                    frame_image = np.array(n_frame, copy=True, order='C')
+                    # covert the array into cv2 default color format
+                    frame_image = cv2.cvtColor(frame_image, cv2.COLOR_RGBA2BGRA)
 
-    # Create nvstreammux instance to form batches from one or more sources.
-    streammux = make_elm_or_print_err("nvstreammux",
-                                      "Stream-muxer",
-                                      "NvStreamMux"
-                                      )
+                save_image = True
+                frame_image = draw_bounding_boxes(frame_image, obj_meta, obj_meta.confidence)
+            try:
+                l_obj = l_obj.next
+            except StopIteration:
+                break
 
-    # Use nvinferserver to run inferencing on decoder's output,
-    # behaviour of inferencing is set through config file
-    pgie = make_elm_or_print_err("nvinferserver",
-                                 "primary-inference",
-                                 "Nvinferserver")
+        print("Frame Number=", frame_number, "Number of Objects=", num_rects, "Vehicle_count=", obj_counter[PGIE_CLASS_ID_VEHICLE], "Person_count=", obj_counter[PGIE_CLASS_ID_PERSON])
+        # Get frame rate through this probe
+        fps_streams["stream{0}".format(frame_meta.pad_index)].get_fps()
+        if save_image:
+            cv2.imwrite(folder_name + "/stream_" + str(frame_meta.pad_index) + "/frame_" + str(frame_number) + ".jpg", frame_image)
+        saved_count["stream_" + str(frame_meta.pad_index)] += 1
+        try:
+            l_frame = l_frame.next
+        except StopIteration:
+            break
 
-    # Use convertor to convert from NV12 to RGBA as required by nvosd
-    nvvidconv = make_elm_or_print_err("nvvideoconvert",
-                                      "convertor",
-                                      "Nvvidconv"
-                                      )
+    return Gst.PadProbeReturn.OK
 
-    # Create OSD to draw on the converted RGBA buffer
-    nvosd = make_elm_or_print_err("nvdsosd",
-                                  "onscreendisplay",
-                                  "OSD (nvosd)"
-                                  )
 
-    # Create Post ODS Convertor for RTSP
-    nvvidconv_post_osd = make_elm_or_print_err("nvvideoconvert",
-                                               "convertor_postosd",
-                                               "Post OSD for nvosd"
-                                               )
-
-    streammux.set_property('width', cfg.CAMERA_WIDTH)
-    streammux.set_property('height', cfg.CAMERA_HEIGHT)
-    streammux.set_property('batch-size', cfg.BATCH_SIZE)
-    streammux.set_property('batched-push-timeout', cfg.BATCH_PUSH_TIMEOUT)
-
-    # Create RTPS Sink Element
-    caps_rtsp, encoder_rtsp, rtppay, sink_rtsp = rtsp_sink(cfg.CODEC,
-                                                           cfg.BITRATE,
-                                                           cfg.UDP_CONF
-                                                           )
-    # -------------------------------------------------
-
-    pgie.set_property("config-file-path", cfg.Model_CONF['config_file'])
-
-    print("Adding elements to Pipeline \n")
-    pipeline.add(source)
-    pipeline.add(nvvidconv_src)
-    pipeline.add(caps_nvvidconv_src)
-    pipeline.add(streammux)
-    pipeline.add(pgie)
-    pipeline.add(nvvidconv)
-    pipeline.add(nvosd)
-    pipeline.add(nvvidconv_post_osd)
-    pipeline.add(caps_rtsp)
-    pipeline.add(encoder_rtsp)
-    pipeline.add(rtppay)
-    pipeline.add(sink_rtsp)
-
-    # add comment to show pipeline struckture.
-
-    print("Linking elements in the Pipeline \n")
-    source.link(nvvidconv_src)
-    nvvidconv_src.link(caps_nvvidconv_src)
-
-    sinkpad = streammux.get_request_pad("sink_0")
-    if not sinkpad:
-        sys.stderr.write(" Unable to get the sink pad of streammux \n")
-    srcpad = caps_nvvidconv_src.get_static_pad("src")
-    if not srcpad:
-        sys.stderr.write(" Unable to get source pad of decoder \n")
-    srcpad.link(sinkpad)
-    streammux.link(pgie)
-    pgie.link(nvvidconv)
-    nvvidconv.link(nvosd)
-    nvosd.link(nvvidconv_post_osd)
-    nvvidconv_post_osd.link(caps_rtsp)
-    caps_rtsp.link(encoder_rtsp)
-    encoder_rtsp.link(rtppay)
-    rtppay.link(sink_rtsp)
-
-    # create an event loop and feed gstreamer bus mesages to it
-    loop = GObject.MainLoop()
-    bus = pipeline.get_bus()
-    bus.add_signal_watch()
-    bus.connect("message", bus_call, loop)
-
-    #  start Streaming
-    server = GstRtspServer.RTSPServer.new()
-    server.props.service = "%d" % cfg.RTSP_PORT
-    server.attach(None)
-
-    factory = GstRtspServer.RTSPMediaFactory.new()
-    factory.set_launch("( udpsrc name=pay0 port=%d buffer-size=524288 caps=\"application/x-rtp, media=video, clock-rate=90000, encoding-name=(string)%s,payload=96 \" )" % (cfg.UDP_CONF['port'], cfg.CODEC))
-
-    factory.set_shared(True)
-    server.get_mount_points().add_factory("/" + str(model), factory)
-
-    print(f"\n *** DeepStream: Launched RTSP Streaming at rtsp://localhost:{cfg.RTSP_PORT}/{model} ***\n\n")
-
-    # Add a probe on the primary-infer source pad
-    # to get inference output tensors
-
-    pgiesrcpad = pgie.get_static_pad("src")
-    if not pgiesrcpad:
-        sys.stderr.write(" Unable to get src pad of primary infer \n")
-
-    pgiesrcpad.add_probe(Gst.PadProbeType.BUFFER, pgie_src_pad_buffer_probe, 0)
-
-    # Lets add probe to get informed of the meta data generated,
-    # we add probe to the sink pad of the osd element,
-    # since by that time, the buffer would have had got all the metadata.
-
-    osdsinkpad = nvosd.get_static_pad("sink")
-    if not osdsinkpad:
-        sys.stderr.write(" Unable to get sink pad of nvosd \n")
-
-    osdsinkpad.add_probe(Gst.PadProbeType.BUFFER, osd_sink_pad_buffer_probe, 0)
-
-    # start play back and listen to events
-    print("Starting pipeline \n")
-    pipeline.set_state(Gst.State.PLAYING)
-    loop.run()
-
-    # cleanup
-    pipeline.set_state(Gst.State.NULL)
+def draw_bounding_boxes(image, obj_meta, confidence):
+    confidence = '{0:.2f}'.format(confidence)
+    rect_params = obj_meta.rect_params
+    top = int(rect_params.top)
+    left = int(rect_params.left)
+    width = int(rect_params.width)
+    height = int(rect_params.height)
+    obj_name = pgie_classes_str[obj_meta.class_id]
+    image = cv2.rectangle(image, (left, top), (left + width, top + height), (0, 0, 255, 0), 2)
+    # Note that on some systems cv2.putText erroneously draws horizontal lines across the image
+    image = cv2.putText(image, obj_name + ',C=' + str(confidence), (left - 10, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255, 0), 2)
+    return image
