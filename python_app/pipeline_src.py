@@ -16,7 +16,6 @@ gi.require_version("Gst","1.0")
 from gi.repository import Gst
 
 
-
 def cis_camera_source(path_camera):
     print(f"Creating  Source for  and CIS Camera wiht the path {path_camera}")
 
@@ -44,7 +43,7 @@ def cis_camera_source(path_camera):
 
     print("elements for source was created and setted!")
 
-    return [source_cis,nvvidconv_src_cis,caps_nvvidconv_src_cis]
+    return [source_cis, nvvidconv_src_cis, caps_nvvidconv_src_cis]
 
 
 
