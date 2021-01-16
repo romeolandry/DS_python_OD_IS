@@ -54,7 +54,7 @@ def make_elm_or_print_err(factoryname, name, printedname, detail=""):
 def osd_sink_pad_buffer_probe(pad, info, u_data):
     frame_number = 0
     # Intiallizing object counter with 0.
-    obj_counter = dict(enumerate([0] * cfg.CLASS_NB))
+    obj_counter = dict(enumerate([0] * cfg.DATA_CONF['nb_classes']))
     num_rects = 0
 
     gst_buffer = info.get_buffer()
@@ -103,7 +103,7 @@ def osd_sink_pad_buffer_probe(pad, info, u_data):
         # memory will not be claimed by the garbage collector.
         # Reading the display_text field here will return the C address of the
         # allocated string. Use pyds.get_string() to get the string content.
-        label_names_from_file = get_label_names_from_file(cfg.COCO_LABEL_PATH)
+        label_names_from_file = get_label_names_from_file(cfg.DATA_CONF['patht_to_label'])
         id_dict = {
             val: index
             for index, val in enumerate(label_names_from_file)
@@ -149,10 +149,10 @@ def add_obj_meta_to_frame(frame_object, batch_meta, frame_meta, label_names):
     obj_meta = pyds.nvds_acquire_obj_meta_from_pool(batch_meta)
     # Set bbox properties. These are in input resolution.
     rect_params = obj_meta.rect_params
-    rect_params.left = int(cfg.IMAGE_WIDTH * frame_object.left)
-    rect_params.top = int(cfg.IMAGE_HEIGHT * frame_object.top)
-    rect_params.width = int(cfg.IMAGE_WIDTH * frame_object.width)
-    rect_params.height = int(cfg.IMAGE_HEIGHT * frame_object.height)
+    rect_params.left = int(cfg.Model_CONF['img_width'] * frame_object.left)
+    rect_params.top = int(cfg.Model_CONF['img_height'] * frame_object.top)
+    rect_params.width = int(cfg.Model_CONF['img_width'] * frame_object.width)
+    rect_params.height = int(cfg.Model_CONF['img_height'] * frame_object.height)
 
     # Semi-transparent yellow backgroud
     rect_params.has_bg_color = 0
@@ -168,7 +168,7 @@ def add_obj_meta_to_frame(frame_object, batch_meta, frame_meta, label_names):
 
     # There is no tracking ID upon detection. The tracker will
     # assign an ID.
-    obj_meta.object_id = cfg.UNTRACKED_OBJECT_ID
+    obj_meta.object_id = cfg.Model_CONF['untracted_object_id']
 
     lbl_id = frame_object.classId
     if lbl_id >= len(label_names):
@@ -214,12 +214,12 @@ def pgie_src_pad_buffer_probe(pad, info, u_data):
     batch_meta = pyds.gst_buffer_get_nvds_batch_meta(hash(gst_buffer))
     l_frame = batch_meta.frame_meta_list
 
-    detection_params = DetectionParam(cfg.CLASS_NB, cfg.ACCURACY_ALL_CLASS)
-    box_size_param = BoxSizeParam(cfg.IMAGE_HEIGHT, cfg.IMAGE_WIDTH,
-                                  cfg.MIN_BOX_WIDTH, cfg.MIN_BOX_HEIGHT)
-    nms_param = NmsParam(cfg.TOP_K, cfg.IOU_THRESHOLD)
+    detection_params = DetectionParam(cfg.DATA_CONF['nb_classes'], cfg.DATA_CONF['accuracy_all_class'])
+    box_size_param = BoxSizeParam(cfg.Model_CONF['img_height'], cfg.Model_CONF['img_width'],
+                                  cfg.Model_CONF['min_box_width'], cfg.Model_CONF['min_box_height'])
+    nms_param = NmsParam(cfg.Model_CONF['top_k'], cfg.Model_CONF['iou_threshold'])
 
-    label_names = get_label_names_from_file(cfg.COCO_LABEL_PATH)
+    label_names = get_label_names_from_file(cfg.DATA_CONF['patht_to_label'])
 
     while l_frame is not None:
         try:
