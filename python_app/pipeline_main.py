@@ -2,6 +2,9 @@ import sys
 import io
 import os
 import gi
+
+import pyds
+
 sys.path.append(os.path.join('..', os.curdir))
 
 gi.require_version("Gst", "1.0")
@@ -14,6 +17,7 @@ from utils.trtis.ssd_parser import (nvds_infer_parse_custom_tf_ssd,
                                     NmsParam,
                                     BoxSizeParam
                                     )
+import configurations.configuration as cfg
                          
 global PGIE_CLASS_ID_VEHICLE
 PGIE_CLASS_ID_VEHICLE = 0
@@ -24,12 +28,37 @@ PGIE_CLASS_ID_BICYCLE = 1
 PGIE_CLASS_ID_PERSON = 2
 PGIE_CLASS_ID_ROADSIGN = 3
 
+global model_cfg
+model_cfg = cfg.Model_CONF
+global data_cfg
+data_cfg = cfg.DATA_CONF
+
+def set_config_data(config_name, value, config_type = None):
+    if config_type == 'data':
+        try:
+            cfg.DATA_CONF[config_name] = value
+        except Exception as e:
+            sys.stderr.write(f" the name {config_name} doesn't exit as data config!")
+    
+    if config_type == 'model':
+        try:
+            cfg.Model_CONF[config_name] = value
+        except Exception as e:
+            sys.stderr.write(f" the name {config_name} doesn't exit as model config!")
+
+    if config_type == 'udp':
+        try:
+            cfg.UDP_CONF[config_name] = value
+        except Exception as e:
+            sys.stderr.write(f" the name {config_name} doesn't exit as model config!")
+
 
 def get_label_names_from_file(filepath):
     """ Read a label file and convert it to string list """
     f = io.open(filepath, "r")
     labels = f.readlines()
     labels = [elm[:-1] for elm in labels]
+    print(labels)
     f.close()
     return labels
 
@@ -48,7 +77,7 @@ def make_elm_or_print_err(factoryname, name, printedname, detail=""):
     return elm
 
 
-def osd_sink_pad_buffer_probe(pad, info, u_data, data_cfg):
+def osd_sink_pad_buffer_probe(pad, info, u_data):
     frame_number = 0
     # Intiallizing object counter with 0.
     obj_counter = dict(enumerate([0] * data_cfg['nb_classes']))
@@ -100,6 +129,7 @@ def osd_sink_pad_buffer_probe(pad, info, u_data, data_cfg):
         # memory will not be claimed by the garbage collector.
         # Reading the display_text field here will return the C address of the
         # allocated string. Use pyds.get_string() to get the string content.
+        # exit(data_cfg['patht_to_label'])
         label_names_from_file = get_label_names_from_file(data_cfg['patht_to_label'])
         id_dict = {
             val: index
@@ -142,8 +172,7 @@ def osd_sink_pad_buffer_probe(pad, info, u_data, data_cfg):
 def add_obj_meta_to_frame(frame_object,
                           batch_meta,
                           frame_meta,
-                          label_names,
-                          model_cfg
+                          label_names
                           ):
 
     """ Inserts an object into the metadata """
@@ -187,7 +216,7 @@ def add_obj_meta_to_frame(frame_object,
 
     txt_params.x_offset = int(rect_params.left)
     txt_params.y_offset = max(0, int(rect_params.top) - 10)
-    txt_params.display_text = ("label_names[lbl_id] {:04.3f}".format(frame_object.detectionConfidence))
+    txt_params.display_text = (label_names[lbl_id] + " " +  "{:04.3f}".format(frame_object.detectionConfidence))
     # Font , font-color and font-size
     txt_params.font_params.font_name = "Serif"
     txt_params.font_params.font_size = 10
@@ -206,9 +235,7 @@ def add_obj_meta_to_frame(frame_object,
 
 def pgie_src_pad_buffer_probe(pad,
                               info,
-                              u_data,
-                              model_cfg,
-                              data_cfg
+                              u_data
                               ):
 
     gst_buffer = info.get_buffer()
