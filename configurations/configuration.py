@@ -5,7 +5,7 @@ CUR_DIR = os.path.abspath(os.curdir)
 
 # INPUT
 CSI_INPUT = "/dev/video0"  # Path to CSI- Camera eg. rasbery
-CAMERA_WIDTH = 960 # 1920
+CAMERA_WIDTH = 540 # 1920
 CAMERA_HEIGHT = 540  #1080
 BATCH_SIZE = 1
 BATCH_PUSH_TIMEOUT = 4000000  # Default is 4000000
@@ -25,7 +25,7 @@ UDP_CONF = {
 
 # MODEL CONFIGURATION
 AVAILABLE_TRT_MODEL = ['resnet10', 'custom']
-AVAILABLE_TRITIS_MODEL = ['yolov3', 'ssd_inceptionv2', 'custom']
+AVAILABLE_TRITIS_MODEL = ['yolov3', 'ssd_inceptionv2', 'mask']
 
 # SSD Model configurtion
 

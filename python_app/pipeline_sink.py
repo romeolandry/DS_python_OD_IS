@@ -15,6 +15,7 @@ import gi
 gi.require_version("Gst","1.0")
 
 from gi.repository import Gst, GstRtspServer
+from python_app.pipeline_main import make_elm_or_print_err
 
 from utils.common.is_aarch_64 import is_aarch64
 
@@ -80,3 +81,14 @@ def rtsp_sink(codec,bitrate,dict_udp,preload_reminder=preload_reminder):
     return [caps_rtsp,encoder_rtsp,rtppay,udp_sink]
 
 
+def local_display():
+    transform = None
+    if is_aarch64():
+        transform = make_elm_or_print_err("nvegltransform",
+                                          "nvegl-transform",
+                                          "transform element for display")
+    print("Create EGLSink \n")
+    sink = make_elm_or_print_err("nveglglessink",
+                                 "nvvideo-renderer",
+                                 "Display output")
+    return transform, sink
