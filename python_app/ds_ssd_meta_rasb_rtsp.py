@@ -87,14 +87,14 @@ def main(model):
 
     # ++++++ create elements for broker ++++++++++++++++++
     msgconv = plmain.make_elm_or_print_err("nvmsgconv",
-                                           "nvmsg-converter",
+                                           "msgconv",
                                            "nvmsgconv to convert for broker")
     
     msgconv.set_property('config',cfg.BROKER_CONF['msconv_cfg_file']) 
     msgconv.set_property('payload-type', cfg.BROKER_CONF['schema_type'])
 
     msgbroker = plmain.make_elm_or_print_err("nvmsgbroker",
-                                             "nvmsg-broker",
+                                             "msgbroker",
                                              "msg broker to send")
     
     msgbroker.set_property('proto-lib', cfg.BROKER_CONF['proto_lib'])
@@ -148,8 +148,8 @@ def main(model):
         pipeline.add(broker_queue)
         pipeline.add(rtsp_queue)
         pipeline.add(msgconv)
-        pipeline.link(msgbroker)
-        print("Broker element was added")
+        pipeline.add(msgbroker)
+        print("Broker elements was added")
 
     pipeline.add(nvvidconv_post_osd_to_rtsp)
     pipeline.add(filter_for_rtsp)
@@ -264,6 +264,7 @@ def main(model):
         osdsinkpad.add_probe(Gst.PadProbeType.BUFFER, plmain.osd_sink_pad_buffer_probe_msg_broker, 0)
     else:
         osdsinkpad.add_probe(Gst.PadProbeType.BUFFER, plmain.osd_sink_pad_buffer_probe, 0)
+    
     # start play back and listen to events
     print("Starting pipeline \n")
     pipeline.set_state(Gst.State.PLAYING)

@@ -277,7 +277,7 @@ def osd_sink_pad_buffer_probe_msg_broker(pad, info, u_data):
                 user_event_meta = pyds.nvds_acquire_user_meta_from_pool(batch_meta)
 
                 if(user_event_meta):
-                    user_event_meta.user_meta_data = msg_meta;
+                    user_event_meta.user_meta_data = msg_meta
                     user_event_meta.base_meta.meta_type = pyds.NvDsMetaType.NVDS_EVENT_MSG_META
                     # Setting callbacks in the event msg meta. The bindings layer
                     # will wrap these callables in C functions. Currently only one
