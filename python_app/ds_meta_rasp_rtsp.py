@@ -25,14 +25,14 @@ from utils.trtis.ssd_parser import (nvds_infer_parse_custom_tf_ssd,
                                     )
 
 from python_app.pipeline_src import cis_camera_source as make_src_elt
-from python_app.pipeline_sink import rtsp_sink
+from python_app.pipeline_sink import rtsp_sink, local_display
 import python_app.pipeline_main as plmain
 # from python_app.pipeline_main import *
 # from python_app.pipeline_main import model_cfg, data_cfg,pgie_src_pad_buffer_probe
 
 # sys.path.append(os.path.abspath(os.curdir))
 
-def main(model):
+def tf_ssd_model(model):
     GObject.threads_init()
     Gst.init(None)
     # Create an Pipeline 
@@ -83,7 +83,7 @@ def main(model):
                                                  "OSD (nvosd) to draw and display"
                                                 )
 
-    # --------------- pipeline elements for sink (output)---------
+    #--------------- pipeline elements for sink (output)---------
 
     # ++++++ create elements for broker ++++++++++++++++++
     msgconv = plmain.make_elm_or_print_err("nvmsgconv",
@@ -118,7 +118,11 @@ def main(model):
                                                                  cfg.UDP_CONF
                                                                 )
     
-    # ------------- Create element for multiple output configuration -----
+    # Create Output for a local display. 
+    
+    transform_display, sink_display = local_display()
+
+    # ------- Create element for multiple output configuration -----
 
     tee = plmain.make_elm_or_print_err("tee",
                                        "nvsink-tee",
@@ -126,12 +130,15 @@ def main(model):
     
     broker_queue = plmain.make_elm_or_print_err("queue",
                                                 "nvtee-broker",
-                                                " queue for broker")
+                                                "queue for broker")
     
     rtsp_queue = plmain.make_elm_or_print_err("queue",
                                               "nvtee-rtsp",
                                               "queue for rtsp")
-                
+
+    display_queue = plmain.make_elm_or_print_err("queue",
+                                              "nvtee-display",
+                                              "queue for rtsp")         
 
     print("Adding all elements to the Pipeline \n")
 
@@ -142,21 +149,28 @@ def main(model):
     pipeline.add(pgie_for_infer)
     pipeline.add(nvvidconv_nv12_to_rgba)
     pipeline.add(nvosd_to_draw)
+    pipeline.add(tee)
 
-    if (model['broker']):
-        pipeline.add(tee)
-        pipeline.add(broker_queue)
-        pipeline.add(rtsp_queue)
-        pipeline.add(msgconv)
-        pipeline.add(msgbroker)
-        print("Broker elements was added")
+    print("Adding Broker elements")
+    pipeline.add(broker_queue)
+    pipeline.add(msgconv)
+    pipeline.add(msgbroker)
 
+    print("Adding RTSP elements")
+    pipeline.add(rtsp_queue)
     pipeline.add(nvvidconv_post_osd_to_rtsp)
     pipeline.add(filter_for_rtsp)
     pipeline.add(encoder_rtsp)
     pipeline.add(rtppay)
     pipeline.add(sink_rtsp)
+    
+    if (model['display']):
+        pipeline.add(display_queue)
+        if transform_display is not None:
+            pipeline.add(transform_display)
+        pipeline.add(sink_display)
 
+    
     print("Linking elements in the  pipeline \n")
 
     source_src.link(src_nvvidconv_1)
@@ -171,47 +185,42 @@ def main(model):
     sinkpad = streammux.get_request_pad("sink_0")
     if not sinkpad:
         sys.stderr.write(" Unable to get the sink pad of streammux \n")
-
     # link the filter src-element  with streaming  output
     srcpad.link(sinkpad)
     streammux.link(pgie_for_infer)
     pgie_for_infer.link(nvvidconv_nv12_to_rgba)
     nvvidconv_nv12_to_rgba.link(nvosd_to_draw)
+    nvosd_to_draw.link(tee)
+    # link elt for rtsp
+    rtsp_queue.link(nvvidconv_post_osd_to_rtsp)
+    nvvidconv_post_osd_to_rtsp.link(filter_for_rtsp)
+    filter_for_rtsp.link(encoder_rtsp)
+    encoder_rtsp.link(rtppay)
+    rtppay.link(sink_rtsp)
 
-    if model['broker']:
-        nvosd_to_draw.link(tee)
-        # link elt for rtsp
-        rtsp_queue.link(nvvidconv_post_osd_to_rtsp)
-        nvvidconv_post_osd_to_rtsp.link(filter_for_rtsp)
-        filter_for_rtsp.link(encoder_rtsp)
-        encoder_rtsp.link(rtppay)
-        rtppay.link(sink_rtsp)
+    # link elt for broker
+    broker_queue.link(msgconv)
+    msgconv.link(msgbroker)
 
-        # link elt for broker
-        broker_queue.link(msgconv)
-        msgconv.link(msgbroker)
+    if model['display']:
+        if transform_display is not None:
+            display_queue.link(transform_display)
+            transform_display.link(sink_display)
+        display_queue.link(sink_display)
 
-        # link th both with tee elt
-        broker_sink_pad = broker_queue.get_static_pad("sink") # get output interface of broker_queue object 
-        rtsp_sink_pad = rtsp_queue.get_static_pad("sink") # get output interface of rtsp_queue object 
-        # instantiate the two output(src) wee need
-        tee_msg_pad = tee.get_request_pad('src_%u') # output for broker
-        tee_rtsp_pad = tee.get_request_pad('src_%u') # output for rtsp
+    # link th both with tee elt
+    broker_sink_pad = broker_queue.get_static_pad("sink") # get output interface of broker_queue object 
+    rtsp_sink_pad = rtsp_queue.get_static_pad("sink") # get output interface of rtsp_queue object 
+    # instantiate the two output(src) wee need
+    tee_msg_pad = tee.get_request_pad('src_%u') # output for broker
+    tee_rtsp_pad = tee.get_request_pad('src_%u') # output for rtsp
 
-        if not tee_msg_pad or not tee_rtsp_pad:
-            sys.stderr.write("Unable to get request pads\n")
-        
-        tee_msg_pad.link(broker_sink_pad)
-        tee_rtsp_pad.link(rtsp_sink_pad)
-        print("linked with broker element")
-
-    else:
-
-        nvosd_to_draw.link(nvvidconv_post_osd_to_rtsp)
-        nvvidconv_post_osd_to_rtsp.link(filter_for_rtsp)
-        filter_for_rtsp.link(encoder_rtsp)
-        encoder_rtsp.link(rtppay)
-        rtppay.link(sink_rtsp)
+    if not tee_msg_pad or not tee_rtsp_pad:
+        sys.stderr.write("Unable to get request pads\n")
+    
+    tee_msg_pad.link(broker_sink_pad)
+    tee_rtsp_pad.link(rtsp_sink_pad)
+    print("linked with broker element")
 
     # create an event loop and feed gstreamer bus mesages to it
     loop = GObject.MainLoop()
@@ -259,11 +268,8 @@ def main(model):
     if not osdsinkpad:
         sys.stderr.write(" Unable to get sink pad of nvosd \n")
 
-    if model['broker']:
-        print("probe with msg_broker was loaded")
-        osdsinkpad.add_probe(Gst.PadProbeType.BUFFER, plmain.osd_sink_pad_buffer_probe_msg_broker, 0)
-    else:
-        osdsinkpad.add_probe(Gst.PadProbeType.BUFFER, plmain.osd_sink_pad_buffer_probe, 0)
+    print("probe with msg_broker was loaded")
+    osdsinkpad.add_probe(Gst.PadProbeType.BUFFER, plmain.osd_sink_pad_buffer_probe_msg_broker, 0)
     
     # start play back and listen to events
     print("Starting pipeline \n")
@@ -272,12 +278,9 @@ def main(model):
     # cleanup
     pipeline.set_state(Gst.State.NULL)
 
-
-
-
 if __name__ == "__main__":
     model = {
-        'broker':True,
+        'display':False,
         'name': 'test_ssd_kafka'
     }
-    main(model)
+    tf_ssd_model(model)

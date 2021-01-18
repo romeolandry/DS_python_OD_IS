@@ -8,6 +8,9 @@ import os
 import gi
 import configurations.configuration as cfg
 
+gi.require_version("Gst", "1.0")
+gi.require_version('GstRtspServer', '1.0')
+
 from gi.repository import GObject, Gst, GstRtspServer
 from utils.common.is_aarch_64 import is_aarch64
 from utils.common.bus_call import bus_call
@@ -20,13 +23,6 @@ import pyds
 
 from python_app.pipeline_src import cis_camera_source as make_src_elt
 from python_app.pipeline_sink import rtsp_sink
-
-sys.path.append(os.path.abspath(os.curdir))
-
-
-gi.require_version("Gst", "1.0")
-gi.require_version('GstRtspServer', '1.0')
-
 
 def get_label_names_from_file(filepath):
     """ Read a label file and convert it to string list """
