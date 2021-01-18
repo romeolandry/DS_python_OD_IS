@@ -51,9 +51,9 @@ DATA_CONF = {
 # msg Broker configuration
 
 BROKER_CONF = {
-    'IP':"localhost",
-    'port':'2181',
-    'topic':'testtopic',
+    'IP':"192.168.0.4",
+    'port':'9092',
+    'topic':'jetson-topic',
     'schema_type' : 0,
     'msconv_cfg_file': "configurations/dstest4_msgconv_config.txt",
     'proto_lib': '/opt/nvidia/deepstream/deepstream-5.0/lib/libnvds_kafka_proto.so'
