@@ -1,7 +1,7 @@
 import argparse
 import sys
 import os
-from python_app import ds_meta_rasp_rtsp
+from local_script import ssd_locale
 from python_app import deepstream_od_resnet10_4_classes as ds_od_restnet
 import configurations.configuration as config
 
@@ -17,39 +17,20 @@ parser.add_argument("--model",
                     help="choose which model you wont to inference; custom you use your own model",
                     required=True
                     )
-parser.add_argument("--local", "-l",
-                    default=False,
-                    action="store_true",
-                    help="True if won to use jetson nano screen."
+
+parser.add_argument("--output_dir",
+                    default= config.OUTPUT_DIR,
+                    help="choose which where the viode will save"
                     )
-
-parser.add_argument("--ip", "-i",
-                    default=config.BROKER_CONF['IP'],
-                    help="Ip-Address for kafka"
-                    )
-
-parser.add_argument("--port","-p",
-                    default="9092",
-                    help="Kafka Port")
-
-parser.add_argument("--topic",
-                    default=config.BROKER_CONF['topic'],
-                    help="give kafka topic"
+parser.add_argument("--bitrate",
+                    default= config.BITRATE,
+                    help="choose which where the viode will save"
                     )
 
 def main(args):
 
-    if not args.local:
-
-        if(args.ip):
-            config.BROKER_CONF['IP']= args.ip
-
-        if(args.port):
-            config.BROKER_CONF['port']= args.port
-
-        if(args.topic):
-            config.BROKER_CONF['topic']= args.topic
-
+    output_dir = args.output_dir
+    bitrate = args.bitrate
     print(" Use Triton server for Inference\n")
 
     if(args.model not in config.AVAILABLE_TRITIS_MODEL):
@@ -57,10 +38,7 @@ def main(args):
         print(f"The availble model are {config.AVAILABLE_TRITIS_MODEL}.")
         sys.stderr.write("choose custom to set your custom madel \n\n")
 
-    if not args.local:
-        ds_meta_rasp_rtsp.tf_ssd_model(args.model)
-    else:
-        ds_meta_rasp_rtsp.tf_ssd_model_local(args.model)
+    ssd_locale.main(output_dir,bitrate)
 
 if __name__ == '__main__':
     args = parser.parse_args()

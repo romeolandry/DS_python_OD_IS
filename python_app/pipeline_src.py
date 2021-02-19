@@ -46,10 +46,3 @@ def cis_camera_source(path_camera):
     return [source_cis, nvvidconv_src_cis, caps_nvvidconv_src_cis]
 
 
-
-
-
-if __name__ == "__main__":
-    Print
-    print(os.curdir)
-

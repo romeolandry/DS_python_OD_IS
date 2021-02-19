@@ -92,3 +92,28 @@ def local_display():
                                  "nvvideo-renderer",
                                  "Display output")
     return transform, sink
+
+def local_output_file(bitrate,output_file, preload_reminder=preload_reminder):
+    
+    nvvidconv2 = make_elm_or_print_err("nvvideoconvert", "convertor_file_output", "Converter 2 (nvvidconv2)")
+
+    capsfilter = make_elm_or_print_err("capsfilter", "capsfilter", "capsfilter")
+
+    caps = Gst.Caps.from_string("video/x-raw, format=I420")
+    capsfilter.set_property("caps", caps)
+
+    encoder = make_elm_or_print_err("avenc_mpeg4", "encoder", "Encoder", preload_reminder)
+    encoder.set_property("bitrate",bitrate)
+
+    codeparser = make_elm_or_print_err("mpeg4videoparse", "mpeg4-parser", 'Code Parser')
+
+    container = make_elm_or_print_err("qtmux", "qtmux", "Container")
+
+    sink = make_elm_or_print_err("filesink", "filesink", "Sink")
+
+    sink.set_property("location", output_file)
+    sink.set_property("sync",0)
+    sink.set_property("async",0)
+
+
+    return (nvvidconv2,capsfilter,encoder,codeparser,container,sink)
