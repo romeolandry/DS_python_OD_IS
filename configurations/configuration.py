@@ -24,14 +24,13 @@ UDP_CONF = {
 
 
 # MODEL CONFIGURATION
-AVAILABLE_TRT_MODEL = ['resnet10', 'custom']
-AVAILABLE_TRITIS_MODEL = ['yolov3', 'ssd_inceptionv2', 'mask']
+AVAILABLE_TRITIS_MODEL = ['ssd_resnet50v1', 'ssd_inceptionv2']
 
 # SSD Model configurtion
 
 # tensorflow
 Model_CONF = {
-    'config_file': "configurations/dstest_ssd_nopostprocess_old.txt",
+    'config_file': "configurations/config_ds_ssd_inceptionv2.txt",
     'untracted_object_id': 0xffffffffffffffff,
     'img_height': 750,
     'img_width': 750,
@@ -45,7 +44,7 @@ Model_CONF = {
 DATA_CONF = {
     'nb_classes': 91,
     'accuracy_all_class': 0.5,
-    'patht_to_label': "Models/tritis_model/ssd_inception_v2_coco_2018_01_28/labels.txt"
+    'patht_to_label': "Models/trtis_model/ssd_inception_v2_coco_2018_01_28/labels.txt"
 }
 
 # msg Broker configuration
