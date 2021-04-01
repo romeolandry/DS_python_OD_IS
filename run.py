@@ -2,7 +2,6 @@ import argparse
 import sys
 import os
 from python_app import ds_meta_rasp_rtsp
-from python_app import deepstream_od_resnet10_4_classes as ds_od_restnet
 import configurations.configuration as config
 
 # Clear the GStreamer cache if pipeline creation 
