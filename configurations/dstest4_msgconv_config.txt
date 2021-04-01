@@ -23,9 +23,9 @@
 [sensor0]
 enable=1
 type=Camera
-id=CAMERA_ID
+id=Rapsbery
 location=45.293701447;-75.8303914499;48.1557479338
-description="Entrance of Garage Right Lane"
+description="Jetson Nano"
 coordinate=5.2;10.1;11.2
 
 [place0]
@@ -53,6 +53,6 @@ place-sub-field3=P2
 [analytics0]
 enable=1
 id=XYZ
-description="Vehicle Detection and License Plate Recognition"
+description="Tracked Obejct"
 source=OpenALR
 version=1.0

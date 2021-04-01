@@ -27,10 +27,7 @@ from utils.trtis.ssd_parser import (nvds_infer_parse_custom_tf_ssd,
 from python_app.pipeline_src import cis_camera_source as make_src_elt
 from python_app.pipeline_sink import rtsp_sink, local_display
 import python_app.pipeline_main as plmain
-# from python_app.pipeline_main import *
-# from python_app.pipeline_main import model_cfg, data_cfg,pgie_src_pad_buffer_probe
 
-# sys.path.append(os.path.abspath(os.curdir))
 
 def tf_ssd_model(model_name):
     GObject.threads_init()

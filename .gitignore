@@ -92,7 +92,7 @@ ipython_config.py
 #Pipfile.lock
 
 # PEP 582; used by e.g. github.com/David-OConnor/pyflow
-__pypackages__/
+__pypackages__/from python_app import deepstream_od_resnet10_4_classes as ds_od_restnet
 
 # Celery stuff
 celerybeat-schedule
@@ -116,10 +116,7 @@ venv.bak/
 
 # Rope project settings
 .ropeproject
-
-# mkdocs documentation
-/site
-
+from python_app import deepstream_od_resnet10_4_classes as ds_od_restnet
 # mypy
 .mypy_cache/
 .dmypy.json

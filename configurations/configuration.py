@@ -5,8 +5,8 @@ CUR_DIR = os.path.abspath(os.curdir)
 
 # INPUT
 CSI_INPUT = "/dev/video0"  # Path to CSI- Camera eg. rasbery
-CAMERA_WIDTH = 1920 # 1920
-CAMERA_HEIGHT = 1080  #1080
+CAMERA_WIDTH = 1280 # 1920
+CAMERA_HEIGHT = 720  #1080
 BATCH_SIZE = 1
 BATCH_PUSH_TIMEOUT = 4000000  # Default is 4000000
 
@@ -31,7 +31,7 @@ AVAILABLE_TRITIS_MODEL = ['yolov3', 'ssd_inceptionv2', 'mask']
 
 # tensorflow
 Model_CONF = {
-    'config_file': "configurations/dstest_ssd_nopostprocess.txt",
+    'config_file': "configurations/dstest_ssd_nopostprocess_old.txt",
     'untracted_object_id': 0xffffffffffffffff,
     'img_height': 750,
     'img_width': 750,
@@ -51,12 +51,12 @@ DATA_CONF = {
 # msg Broker configuration
 
 BROKER_CONF = {
-    'IP':"192.168.0.5",
+    'IP':"192.168.0.2",
     'port':'9092',
     'topic':'jetson-topic',
     'schema_type' : 0,
     'msconv_cfg_file': "configurations/dstest4_msgconv_config.txt",
-    'proto_lib': '/opt/nvidia/deepstream/deepstream-5.0/lib/libnvds_kafka_proto.so'
+    'proto_lib': '/opt/nvidia/deepstream/deepstream-5.1/lib/libnvds_kafka_proto.so'
 }
 
 MAX_TIME_STAMP_LEN=32
