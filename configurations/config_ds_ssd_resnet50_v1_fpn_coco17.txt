@@ -7,7 +7,7 @@ infer_config {
       model_name: "ssd_resnet50_v1_fpn_coco17"
       version: -1
       model_repo {
-        root: "../Models/tritis_model"
+        root: "../Models/trtis_model"
         log_level: 2
         tf_gpu_memory_fraction: 0.35
         tf_disable_soft_placement: 0
@@ -30,7 +30,7 @@ infer_config {
   }
 
   postprocess {
-    labelfile_path: "../Models/tritis_model/ssd_resnet50_v1_fpn_coco17/labels.txt"
+    labelfile_path: "../Models/trtis_model/ssd_resnet50_v1_fpn_coco17/labels.txt"
     detection {
       num_detected_classes: 91
       custom_parse_bbox_func: "NvDsInferParseCustomTfSSD"
