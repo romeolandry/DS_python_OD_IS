@@ -4,6 +4,8 @@ import os
 import gi
 
 import pyds
+import cv2
+import numpy as np
 
 sys.path.append(os.path.join('..', os.curdir))
 
@@ -158,7 +160,9 @@ def osd_sink_pad_buffer_probe(pad, info, u_data):
         py_nvosd_text_params.set_bg_clr = 1
         # set(red, green, blue, alpha); set to Black
         py_nvosd_text_params.text_bg_clr.set(0.0, 0.0, 0.0, 1.0)
+        
         # Using pyds.get_string() to get display_text as string
+        
         print(pyds.get_string(py_nvosd_text_params.display_text))
         pyds.nvds_add_display_meta_to_frame(frame_meta, display_meta)
         try:
@@ -532,15 +536,20 @@ def tiler_sink_pad_buffer_probe(pad, info, u_data):
 
     return Gst.PadProbeReturn.OK
 
+def get_label_name(id_dict, obejct_id):
+    for key,val in id_dict.items():
+        if val == obejct_id:
+            return key
+    return None
 
-def draw_bounding_boxes(image, obj_meta, confidence):
+def draw_bounding_boxes(image, obj_meta, confidence, id_dict):
     confidence = '{0:.2f}'.format(confidence)
     rect_params = obj_meta.rect_params
     top = int(rect_params.top)
     left = int(rect_params.left)
     width = int(rect_params.width)
     height = int(rect_params.height)
-    obj_name = pgie_classes_str[obj_meta.class_id]
+    obj_name = get_label_name(id_dict,obj_meta.class_id)
     image = cv2.rectangle(image, (left, top), (left + width, top + height), (0, 0, 255, 0), 2)
     # Note that on some systems cv2.putText erroneously draws horizontal lines across the image
     image = cv2.putText(image, obj_name + ',C=' + str(confidence), (left - 10, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255, 0), 2)
@@ -579,30 +588,30 @@ def meta_copy_func(data,user_data):
 
     if(srcmeta.objSignature.size>0):
         dstmeta.objSignature.signature=pyds.memdup(srcmeta.objSignature.signature,srcMeta.objSignature.size)
-        dstmeta.objSignature.size = srcmeta.objSignature.size;
+        dstmeta.objSignature.size = srcmeta.objSignature.size
 
     if(srcmeta.extMsgSize>0):
         if(srcmeta.objType==pyds.NvDsObjectType.NVDS_OBJECT_TYPE_VEHICLE):
-            srcobj = pyds.NvDsVehicleObject.cast(srcmeta.extMsg);
-            obj = pyds.alloc_nvds_vehicle_object();
+            srcobj = pyds.NvDsVehicleObject.cast(srcmeta.extMsg)
+            obj = pyds.alloc_nvds_vehicle_object()
             obj.type=pyds.get_string(srcobj.type)
             obj.make=pyds.get_string(srcobj.make)
             obj.model=pyds.get_string(srcobj.model)
             obj.color=pyds.get_string(srcobj.color)
             obj.license = pyds.get_string(srcobj.license)
             obj.region = pyds.get_string(srcobj.region)
-            dstmeta.extMsg = obj;
+            dstmeta.extMsg = obj
             dstmeta.extMsgSize = sys.getsizeof(pyds.NvDsVehicleObject)
         if(srcmeta.objType==pyds.NvDsObjectType.NVDS_OBJECT_TYPE_PERSON):
-            srcobj = pyds.NvDsPersonObject.cast(srcmeta.extMsg);
+            srcobj = pyds.NvDsPersonObject.cast(srcmeta.extMsg)
             obj = pyds.alloc_nvds_person_object()
             obj.age = srcobj.age
-            obj.gender = pyds.get_string(srcobj.gender);
+            obj.gender = pyds.get_string(srcobj.gender)
             obj.cap = pyds.get_string(srcobj.cap)
             obj.hair = pyds.get_string(srcobj.hair)
-            obj.apparel = pyds.get_string(srcobj.apparel);
-            dstmeta.extMsg = obj;
-            dstmeta.extMsgSize = sys.getsizeof(pyds.NvDsVehicleObject);
+            obj.apparel = pyds.get_string(srcobj.apparel)
+            dstmeta.extMsg = obj
+            dstmeta.extMsgSize = sys.getsizeof(pyds.NvDsVehicleObject)
 
     return dstmeta
 
@@ -638,9 +647,11 @@ def meta_free_func(data,user_data):
         pyds.free_gbuffer(srcmeta.extMsg);
         srcmeta.extMsgSize = 0;
 
-def generate_vehicle_meta(data):
-    obj = pyds.NvDsVehicleObject.cast(data);
-    obj.type ="sedan"
+def generate_vehicle_meta(data,save_path):
+    obj = pyds.NvDsVehicleObject.cast(data)
+    obj.type ="none"
+    if save_path is not None:
+        obj.type = save_path
     obj.color="blue"
     obj.make ="Bugatti"
     obj.model = "M"
@@ -648,16 +659,30 @@ def generate_vehicle_meta(data):
     obj.region ="CA"
     return obj
 
-def generate_person_meta(data):
+def generate_person_meta(data,save_path):
     obj = pyds.NvDsPersonObject.cast(data)
+    
     obj.age = 45
     obj.cap = "none"
+    if save_path is not None:
+        obj.cap= save_path
     obj.hair = "black"
     obj.gender = "male"
     obj.apparel= "formal"
     return obj
 
-def generate_event_msg_meta(data, class_id):
+def generate_phone_meta(data,save_path):
+    obj = pyds.NvDsPersonObject.cast(data)
+    obj.age = 45
+    obj.cap = "none"
+    if save_path is not None:
+        obj.cap= save_path
+    obj.hair = "black"
+    obj.gender = "male"
+    obj.apparel= "formal"
+    return obj
+
+def generate_event_msg_meta(data, class_id,id_dict,save_path):
     meta =pyds.NvDsEventMsgMeta.cast(data)
     meta.sensorId = 0
     meta.placeId = 0
@@ -670,21 +695,159 @@ def generate_event_msg_meta(data, class_id):
     # Any custom object as per requirement can be generated and attached
     # like NvDsVehicleObject / NvDsPersonObject. Then that object should
     # be handled in payload generator library (nvmsgconv.cpp) accordingly.
-    if(class_id==cfg.PGIE_CLASS_ID_VEHICLE):
+    if(class_id==id_dict["car"]):
         meta.type = pyds.NvDsEventType.NVDS_EVENT_MOVING
         meta.objType = pyds.NvDsObjectType.NVDS_OBJECT_TYPE_VEHICLE
-        meta.objClassId = PGIE_CLASS_ID_VEHICLE
+        meta.objClassId = id_dict["car"]
         obj = pyds.alloc_nvds_vehicle_object()
-        obj = generate_vehicle_meta(obj)
+        obj = generate_vehicle_meta(obj,save_path)
         meta.extMsg = obj
         meta.extMsgSize = sys.getsizeof(pyds.NvDsVehicleObject);
-    if(class_id == cfg.PGIE_CLASS_ID_PERSON):
+    if(class_id == id_dict["person"]):
         meta.type =pyds.NvDsEventType.NVDS_EVENT_ENTRY
         meta.objType = pyds.NvDsObjectType.NVDS_OBJECT_TYPE_PERSON;
-        meta.objClassId = cfg.PGIE_CLASS_ID_PERSON
+        meta.objClassId = id_dict["person"]
         obj = pyds.alloc_nvds_person_object()
-        obj=generate_person_meta(obj)
+        obj=generate_person_meta(obj,save_path)
+        meta.extMsg = obj
+        meta.extMsgSize = sys.getsizeof(pyds.NvDsPersonObject)
+    if(class_id == id_dict["cell phone"]):
+        meta.type =pyds.NvDsEventType.NVDS_EVENT_ENTRY
+        meta.objType = pyds.NvDsObjectType.NVDS_OBJECT_TYPE_PERSON;
+        meta.objClassId = id_dict["person"]
+        obj = pyds.alloc_nvds_person_object()
+        obj=generate_phone_meta(obj,save_path)
         meta.extMsg = obj
         meta.extMsgSize = sys.getsizeof(pyds.NvDsPersonObject)
     return meta
 
+
+def osd_sink_pad_buffer_probe_msg_broker_drawing(pad, info, u_data):
+    frame_number = 0
+    num_rects =0
+
+    # Intiallizing object counter with 0.
+    obj_counter = dict(enumerate([0] * data_cfg['nb_classes']))
+
+    gst_buffer = info.get_buffer()
+
+    if not gst_buffer:
+        print("Unable to get GstBuffer")
+        return
+    # Retrieve batch metadata from the gst_buffer
+    # Note that pyds.gst_buffer_get_nvds_batch_meta() expects the
+    # C address of gst_buffer as input, which is obtained with hash(gst_buffer)
+    batch_meta = pyds.gst_buffer_get_nvds_batch_meta(hash(gst_buffer))
+    l_frame = batch_meta.frame_meta_list
+    while l_frame is not None:
+        try:
+            frame_meta = pyds.NvDsFrameMeta.cast(l_frame.data)
+        except StopIteration:
+            break
+
+        frame_number = frame_meta.frame_num
+        num_rects = frame_meta.num_obj_meta
+        l_obj = frame_meta.obj_meta_list
+        save_image = False
+        while l_obj is not None:
+            try:
+                # Casting l_obj.data to pyds.NvDsObjectMeta
+                obj_meta = pyds.NvDsObjectMeta.cast(l_obj.data)
+            except StopIteration:
+                continue
+
+            obj_counter[obj_meta.class_id] += 1
+
+            display_meta = pyds.nvds_acquire_display_meta_from_pool(batch_meta)
+            display_meta.num_labels = 1
+
+            py_nvosd_text_params = display_meta.text_params[0]
+
+            label_names_from_file = get_label_names_from_file(data_cfg['patht_to_label'])
+            id_dict = {
+                val: index
+                for index, val in enumerate(label_names_from_file)
+            }
+            tracked_id = []
+            for val in cfg.Tracked:
+                tracked_id.append(id_dict[val])
+
+            disp_string = ("Frame Number={} Number of Objects={} Vehicle_count={} Person_count={} Phone_count={}")
+
+            py_nvosd_text_params.display_text = disp_string.format(
+                frame_number,
+                num_rects,
+                obj_counter[id_dict["car"]],
+                obj_counter[id_dict["person"]],
+                obj_counter[id_dict["cell phone"]],
+            )
+            py_nvosd_text_params.x_offset = 10
+            py_nvosd_text_params.y_offset = 12
+            py_nvosd_text_params.font_params.font_name = "Serif"
+            py_nvosd_text_params.font_params.font_size = 10
+            py_nvosd_text_params.font_params.font_color.set(1.0, 1.0, 1.0, 1.0)
+
+            # Text background color
+            py_nvosd_text_params.set_bg_clr = 1
+            # set(red, green, blue, alpha); set to Black
+            py_nvosd_text_params.text_bg_clr.set(0.0, 0.0, 0.0, 1.0)
+
+            # get object with somme score draw it and sent it to backend
+            # server using msgbrker
+            if( obj_meta.class_id in tracked_id):
+                # Draw and save with open cv
+                save_path = None
+                # Getting Image data using nvbufsurface
+                # the input should be address of buffer and batch_id
+                n_frame = pyds.get_nvds_buf_surface(hash(gst_buffer), frame_meta.batch_id)
+                # convert python array into numy array format.
+                frame_image = np.array(n_frame, copy=True, order='C')
+                # covert the array into cv2 default color format
+                frame_image = cv2.cvtColor(frame_image, cv2.COLOR_RGBA2BGRA)
+                if (obj_meta.confidence  < .3 ):
+                    save_path = os.path.join(os.getcwd(),cfg.OUTPUT_DIR + "/stream_" + str(frame_meta.pad_index) + "/frame_" + str(frame_number) + ".jpg")
+                    cv2.imwrite(save_path, frame_image)
+
+                if (obj_meta.confidence  < .8 ):   
+                    frame_image = draw_bounding_boxes(frame_image, obj_meta, obj_meta.confidence, id_dict)
+                    save_path = os.path.join(os.getcwd(),cfg.OUTPUT_DIR + "/stream_" + str(frame_meta.pad_index) + "/frame_" + str(frame_number) + ".jpg")
+                    cv2.imwrite(save_path, frame_image)
+                                    
+                msg_meta=pyds.alloc_nvds_event_msg_meta()
+                msg_meta.bbox.top =  obj_meta.rect_params.top
+                msg_meta.bbox.left =  obj_meta.rect_params.left
+                msg_meta.bbox.width = obj_meta.rect_params.width
+                msg_meta.bbox.height = obj_meta.rect_params.height
+                msg_meta.frameId = frame_number
+                msg_meta.trackingId = long_to_int(obj_meta.object_id)
+                msg_meta.confidence = obj_meta.confidence
+                msg_meta = generate_event_msg_meta(msg_meta, obj_meta.class_id,id_dict,save_path)
+                user_event_meta = pyds.nvds_acquire_user_meta_from_pool(batch_meta)
+                if(user_event_meta):
+                    user_event_meta.user_meta_data = msg_meta
+                    user_event_meta.base_meta.meta_type = pyds.NvDsMetaType.NVDS_EVENT_MSG_META
+                    # Setting callbacks in the event msg meta. The bindings layer
+                    # will wrap these callables in C functions. Currently only one
+                    # set of callbacks is supported.
+                    pyds.set_user_copyfunc(user_event_meta, meta_copy_func)
+                    pyds.set_user_releasefunc(user_event_meta, meta_free_func)
+                    pyds.nvds_add_user_meta_to_frame(frame_meta, user_event_meta)                        
+                else:
+                    print("Error in attaching event meta to buffer\n")
+                
+            
+            print(pyds.get_string(py_nvosd_text_params.display_text))
+            
+            pyds.nvds_add_display_meta_to_frame(frame_meta, display_meta)
+
+            try:
+                l_obj=l_obj.next
+            except StopIteration:
+                break
+        
+        try:
+            l_frame = l_frame.next
+        except StopIteration:
+            break
+
+    return Gst.PadProbeReturn.OK

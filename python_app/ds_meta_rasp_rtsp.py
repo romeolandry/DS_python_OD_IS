@@ -98,7 +98,9 @@ def tf_ssd_model(model_name):
     msgbroker.set_property('conn-str', cfg.BROKER_CONF['IP'] + ";" + cfg.BROKER_CONF['port'] + ";" + cfg.BROKER_CONF['topic']) # "ip;port;topicname"
     msgbroker.set_property('sync', False)
 
-
+    # create directory to save fram if notexist
+    if not os.path.isdir(cfg.OUTPUT_DIR):
+        os.mkdir(os.path.join(os.getcwd(),cfg.OUTPUT_DIR))
 
     # +++++++++++++++++++++ RTSP elements +++++++++++++++
     # To create and post convertor 
@@ -251,7 +253,11 @@ def tf_ssd_model(model_name):
         sys.stderr.write(" Unable to get sink pad of nvosd \n")
 
     print("probe with msg_broker was loaded")
-    osdsinkpad.add_probe(Gst.PadProbeType.BUFFER, plmain.osd_sink_pad_buffer_probe_msg_broker, 0)
+    # send info to the backen server
+    # osdsinkpad.add_probe(Gst.PadProbeType.BUFFER, plmain.osd_sink_pad_buffer_probe_msg_broker, 0)
+
+    # send info to the backen server and draw bounding box to somme frame
+    osdsinkpad.add_probe(Gst.PadProbeType.BUFFER, plmain.osd_sink_pad_buffer_probe_msg_broker_drawing, 0)
     
     # start play back and listen to events
     print("Starting pipeline \n")
