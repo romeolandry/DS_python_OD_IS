@@ -254,8 +254,7 @@ def tf_ssd_model(model_name):
 
     print("probe with msg_broker was loaded")
     # send info to the backen server
-    # osdsinkpad.add_probe(Gst.PadProbeType.BUFFER, plmain.osd_sink_pad_buffer_probe_msg_broker, 0)
-
+    
     # send info to the backen server and draw bounding box to somme frame
     osdsinkpad.add_probe(Gst.PadProbeType.BUFFER, plmain.osd_sink_pad_buffer_probe_msg_broker_drawing, 0)
     
