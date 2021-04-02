@@ -138,3 +138,5 @@ dmypy.json
 
 # vscode
 .vscode
+
+# /Models/trtis_model/ssd_resnet50_v1_fpn_coco17/*
