@@ -26,7 +26,11 @@ Once its done, change the path of kafka library and of the path Custompaerser. E
 - `birate` and `codec` can also be configurate in the same file.
 
 ## Done
-
+- [x] Parser Freezed tensorflow model and apply inference using triton inference server
+- [x] build pipeline that parser the on-Screnn Display objet and extract somme frame.
+- [x] send Information to the Server using Apache kafta
+- [x] Stream OSD as RTSP link
 ## To Do
-- [] 
+- [] Save video localy
+- []  Add Instance segmentaion model
 
