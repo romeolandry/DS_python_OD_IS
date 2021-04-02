@@ -114,7 +114,7 @@ venv.bak/
 .spyderproject
 .spyproject
 
-# Rope project settings
+# Rope project settings# Getting Image data using nvbufsurface
 .ropeproject
 from python_app import deepstream_od_resnet10_4_classes as ds_od_restnet
 # mypy
@@ -133,7 +133,8 @@ dmypy.json
 /deepstream-ssd-parser
 
 # streams
-/streams/
+/frames/
+
 
 # vscode
 .vscode
