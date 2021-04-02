@@ -12,9 +12,9 @@ import configurations.configuration as config
 parser = argparse.ArgumentParser(description='RTSP Output Sample Application Help ')
 ## Model configuration
 parser.add_argument("--model",
-                    choices= list(set(config.AVAILABLE_TRT_MODEL + config.AVAILABLE_TRITIS_MODEL)),
-                    help="choose which model you wont to inference; custom you use your own model",
-                    required=True
+                     choices= config.AVAILABLE_TRITIS_MODEL,
+                     help="choose which model you wont to inference; custom you use your own model",
+                     required=True
                     )
 parser.add_argument("--local", "-l",
                     default=False,
