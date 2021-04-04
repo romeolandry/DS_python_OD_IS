@@ -18,9 +18,7 @@ Once its done, change the path of kafka library and of the path Custompaerser. E
 **Parameters**
 
 - `--model` Give the of the model you wont to inference with. the both inerence have already pre-configured model setting.
-    - TensorRT `['resnet10','custom']`
-    - Trinton Inference Server `['yolov3', 'ssd_inceptionv2', 'custom']`
-    - choose `custom` to run the inference methode with you own model.
+    - Trinton Inference Server `['ssd_inceptionv2']`
 
 - `--input` to give the input path of Raspberry camera. the default has already been setted in to [the run configuration file](/configurations/configuration.py).
 - `birate` and `codec` can also be configurate in the same file.
@@ -31,6 +29,7 @@ Once its done, change the path of kafka library and of the path Custompaerser. E
 - [x] send Information to the Server using Apache kafta
 - [x] Stream OSD as RTSP link
 ## To Do
+- [] save frame with opencv; didn't work.
 - [] Save video localy
 - []  Add Instance segmentaion model
 
