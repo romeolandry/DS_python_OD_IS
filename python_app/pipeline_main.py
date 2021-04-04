@@ -486,14 +486,12 @@ def osd_sink_pad_buffer_probe_msg_broker_drawing(pad, info, u_data):
                 frame_image = np.array(n_frame, copy=True, order='C')
                 # covert the array into cv2 default color format
                 frame_image = cv2.cvtColor(frame_image, cv2.COLOR_RGBA2BGRA)
-                if (obj_meta.confidence  < .3 ):
+                if (obj_meta.confidence  >.5 ):
                     save_path = os.path.join(os.getcwd(),cfg.OUTPUT_DIR + "/stream_" + str(frame_meta.pad_index) + "/frame_" + str(frame_number) + ".jpg")
-                    cv2.imwrite(save_path, frame_image)
-
-                if (obj_meta.confidence  < .8 ):   
-                    frame_image = draw_bounding_boxes(frame_image, obj_meta, obj_meta.confidence, id_dict)
-                    save_path = os.path.join(os.getcwd(),cfg.OUTPUT_DIR + "/stream_" + str(frame_meta.pad_index) + "/frame_" + str(frame_number) + ".jpg")
-                    cv2.imwrite(save_path, frame_image)
+                    try:
+                        cv2.imwrite(save_path, frame_image)
+                    except Exception as e:
+                        print("open cv didn't save")
                                     
                 msg_meta=pyds.alloc_nvds_event_msg_meta()
                 msg_meta.bbox.top =  obj_meta.rect_params.top
