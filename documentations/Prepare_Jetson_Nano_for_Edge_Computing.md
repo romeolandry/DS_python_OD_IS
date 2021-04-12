@@ -117,6 +117,7 @@ For more explanation please read [nvidia Deepstream API](https://docs.nvidia.com
 
   ```shell
   $ sudo apt-get install libglib2.0 libglib2.0-dev
+  $ sudo apt-get install gir1.2-gst-rtsp-server-1.0
   ```
   
 
@@ -143,22 +144,6 @@ $ ./autogen.sh PYTHON=python3
 $ ./configure PYTHON=python3
 $ make
 $ sudo make install
-
-```
-
-Move to installed <DeepStream 5.x>/sources/ and clone the DeepStream_python_Apps repository
-
-```shell
-$ git clone https://github.com/NVIDIA-AI-IOT/deepstream_python_apps
-```
-
-To enable the import of DeepStream library from Python App. 
-
-```shell
-$ cd /opt/nvidia/deepstream/deepstream/lib
-$ Python3 setup.py install
-```
-
 
 
 ##  Configure Python
