@@ -44,7 +44,7 @@ Model_CONF = {
 DATA_CONF = {
     'nb_classes': 91,
     'accuracy_all_class': 0.5,
-    'patht_to_label': "Models/trtis_model/ssd_inception_v2_coco_2018_01_28/labels.txt"
+    'patht_to_label': "Models/trtis_model/ssd_inception_v2_coco_2018_01_28/labels.txt" 
 }
 
 # msg Broker configuration

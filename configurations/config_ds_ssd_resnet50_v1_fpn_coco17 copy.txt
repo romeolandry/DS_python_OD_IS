@@ -31,7 +31,15 @@ infer_config {
 
   postprocess {
     labelfile_path: "../Models/trtis_model/ssd_resnet50_v1_fpn_coco17/labels.txt"
-    other{}
+    detection {
+      num_detected_classes: 91
+      custom_parse_bbox_func: "NvDsInferParseCustomResnet"
+      nms {
+        confidence_threshold: 0.5
+        iou_threshold: 0.3
+        topk : 20
+      }
+    }
   }
   
   extra {
@@ -49,7 +57,9 @@ input_control {
 }
 
 output_control {
-  output_tensor_meta: true
+  detect_control {
+    default_filter { bbox_filter { min_width: 32, min_height: 32 } }
+  }
 }
 
 
